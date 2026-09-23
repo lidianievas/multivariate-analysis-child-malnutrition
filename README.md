@@ -1,98 +1,96 @@
-📊 Multivariate Analysis of Child Vulnerability & Malnutrition | Action Against Hunger (Guatemala)
+# 📊 Multivariate Analysis of Child Vulnerability & Malnutrition
 
-Este repositorio contiene el trabajo final de análisis estadístico multivariante desarrollado en la Universidad de Granada (UGR), centrado en la caracterización de la desnutrición infantil y la vulnerabilidad sociodemográfica en el Corredor Seco de Guatemala a partir de datos de la encuesta estandarizada SMART (2014).
+Proyecto de **Análisis Estadístico Multivariante** realizado en el **Grado en Matemáticas de la Universidad de Granada**, basado en datos de la encuesta **SMART (2014)** y centrado en el estudio de la vulnerabilidad nutricional infantil en el **Corredor Seco de Guatemala**.
 
-📌 Contexto del Proyecto
+## 📌 Descripción
 
-En 2014, el Corredor Seco guatemalteco enfrentó una severa crisis humanitaria derivada de una sequía prolongada (45 días) y la plaga de la roya del café (La Roya). Estos eventos agotaron las reservas básicas de grano y mermaron la oferta de mano de obra agrícola en comunidades rurales.
+El objetivo del proyecto fue analizar diferentes factores relacionados con la **desnutrición infantil y el retraso en el crecimiento (stunting)** en niños de 6 a 59 meses, estudiando la relación entre variables antropométricas, socioeconómicas y geográficas.
 
-El objetivo central del estudio fue evaluar e identificar qué variables explican y predicen con mayor precisión la vulnerabilidad nutricional y el retraso en el crecimiento (stunting) en niños de 6 a 59 meses, contrastando el peso predictivo de indicadores biométricos frente a variables socioeconómicas y geográficas.
+Para ello, se aplicaron diferentes técnicas de análisis estadístico multivariante para **reducir la dimensionalidad de los datos, identificar perfiles de vulnerabilidad y construir modelos de clasificación**.
 
-🔬 Metodología y Técnicas Estadísticas
+## 🔬 Metodología
 
-El análisis se llevó a cabo íntegramente en R, cubriendo las siguientes etapas y métodos multivariantes:
+El análisis se desarrolló íntegramente en **R** y se estructuró en varias etapas:
 
-Preprocesamiento y Limpieza de Datos:
+### 1. Preprocesamiento de datos
 
-Consolidación y fusión de bases de datos ($N = 704$ menores).
+* Limpieza y transformación de los datos.
+* Integración de diferentes fuentes de información.
+* Análisis de datos faltantes e imputación.
+* Estandarización de variables.
 
-Análisis de homogeneidad en datos faltantes ($p > 0.05$) e imputación.
+### 2. Análisis de componentes y factores
 
-Normalización de variables continuas (Z-scores).
+Se utilizaron técnicas de reducción de dimensionalidad para estudiar la estructura de las variables:
 
-Reducción de la Dimensionalidad:
+* **PCA (Principal Component Analysis)**
+* **Factor Analysis**
+* Test de esfericidad de Bartlett.
+* Medida de adecuación muestral KMO.
+* Rotación Varimax.
 
-PCA (Principal Component Analysis): Verificación de supuestos con test de esfericidad de Bartlett y KMO ($\text{MSA} = 0.75$). Retención de 3 componentes principales explicando el 86% de la varianza total acumulada.
+### 3. Análisis de conglomerados
 
-FA (Factor Analysis): Estimación por residuos mínimos (minres) y rotación ortogonal Varimax. Estructura óptima de 3 factores latentes explicando el 75.1% de la varianza:
+Se aplicó **clustering jerárquico** para identificar grupos de individuos con características similares.
 
-Factor 1: Desarrollo físico integral (WEIGHT, HEIGHT, MONTHS).
+La selección del número de grupos se apoyó en:
 
-Factor 2: Dimensión geográfica/territorial (ESTRATO.x).
+* Método de la silueta (*Silhouette Method*).
+* Método del codo (*Elbow Method*).
+* Dendrogramas.
 
-Factor 3: Balance y proporcionalidad nutricional aguda (MUAC - circunferencia braquial media).
+### 4. Clasificación
 
-Segmentación de la Población:
+Se estudió la capacidad de diferentes modelos de análisis discriminante para clasificar el estado de crecimiento infantil:
 
-Cluster Analysis (Hierarchical Clustering): Determinación del número óptimo de agrupaciones mediante el coeficiente de silueta (Silhouette Method), método del codo (Elbow Method / WSS) y dendrograma jerárquico.
+* **Linear Discriminant Analysis (LDA)**
+* **Quadratic Discriminant Analysis (QDA)**
+* División de los datos en conjuntos de entrenamiento y prueba.
+* Evaluación del rendimiento mediante validación sobre datos no utilizados para el entrenamiento.
 
-Se validaron 2 perfiles claros de vulnerabilidad:
+## 📈 Resultados
 
-Cluster 1 (Alto Riesgo Biológico): Medias estandarizadas negativas en peso (-0.83), talla (-0.83), edad (-0.85) y MUAC (-0.52).
+Entre los principales resultados del análisis:
 
-Cluster 2 (Mayor Estabilidad Biológica/Económica): Valores superiores al promedio muestral en todas las métricas biométricas e ingresos.
+* La reducción de dimensionalidad permitió identificar estructuras latentes relacionadas con las características antropométricas y territoriales de la muestra.
+* El análisis de conglomerados permitió identificar **dos perfiles diferenciados** dentro de la población estudiada.
+* Los modelos discriminantes mostraron una capacidad de clasificación del estado de *stunting* del **82% de acierto** en el conjunto de evaluación.
+* Las variables antropométricas mostraron una relación especialmente relevante con la clasificación del estado nutricional dentro de los modelos analizados.
 
-Clasificación y Validación Predictiva:
+## 🛠️ Tecnologías y herramientas
 
-Discriminant Analysis (LDA & QDA): Variable dependiente STUNTING (retraso en el crecimiento).
+**Lenguaje**
 
-Evaluación de supuestos de normalidad multivariante (Shapiro-Wilk) y test M de Box ($p < 9.84 \times 10^{-16}$), justificando el uso de fronteras cuadráticas (QDA).
+* R
 
-Validación cruzada con partición 80% entrenamiento / 20% prueba.
+**Análisis estadístico**
 
-Tasa de acierto / Precisión: 82% de clasificación correcta.
+* `psych`
+* `FactoMineR`
+* `factoextra`
+* `MASS`
+* `biotools`
 
-💡 Principales Conclusiones
+**Manipulación y visualización**
 
-Primacía Biométrica: A pesar de que la ubicación geográfica y la economía familiar definen el entorno estructural, la identificación efectiva del stunting depende de forma casi exclusiva de variables antropométricas (peso y talla, seguidas de MUAC).
-
-Inconsistencia de Predictores Socioeconómicos: Indicadores como el número de fuentes de ingresos (NUM_FUENT_INGRES) o el estrato presentaron solapamiento y bajo poder de discriminación directa sobre el estado nutricional agudo/crónico.
-
-Implicación en Políticas de Ayuda: Las estrategias de triaje y focalización de fondos de emergencia deben priorizar el monitoreo antropométrico sistemático en centros de salud comunitarios por encima de los censos meramente económicos.
-
-📁 Estructura del Repositorio
-
-├── data/
-│   └── raw/                  # Datos brutos de la encuesta SMART (si aplica)
-│   └── processed/            # Dataset limpio tras imputación (N=704)
-├── scripts/
-│   ├── 01_data_cleaning.R    # Limpieza, homogeneidad e imputación
-│   ├── 02_pca_fa.R           # Análisis de componentes principales y factorial
-│   ├── 03_cluster_analysis.R # Clustering jerárquico, métricas de corte
-│   └── 04_discriminant.R     # Modelado LDA / QDA y mapas de partición
-├── reports/
-│   └── Action_against_hunger.pdf  # Informe técnico final
-└── README.md
+* `tidyverse`
+* `dplyr`
+* `ggplot2`
+* `corrplot`
+* `dendextend`
 
 
-🛠️ Paquetes de R Utilizados
+## 👥 Autores
 
-Análisis Multivariante: psych, FactoMineR, factoextra, MASS, biotools
+Proyecto realizado en el marco del **Grado en Matemáticas de la Universidad de Granada** por:
 
-Visualización: ggplot2, corrplot, dendextend
+* María Teresa Torres Aguilar
+* Margarita Conde Jarava
+* Lidia Nievas Dueñas
+* Lucía Tejero Jiménez
+* María del Pilar Caba Magán
 
-Manipulación de Datos: tidyverse, dplyr
+---
 
-👥 Autores
+**Proyecto académico — Análisis Estadístico Multivariante**
 
-Trabajo realizado en el marco de la Universidad de Granada (UGR) por:
-
-María Teresa Torres Aguilar
-
-Margarita Conde Jarava
-
-Lidia Nievas Dueñas
-
-Lucía Tejero Jiménez
-
-María del Pilar Caba Magán
