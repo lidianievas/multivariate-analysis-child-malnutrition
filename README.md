@@ -46,7 +46,7 @@ Se estudió la capacidad de diferentes modelos de análisis discriminante para c
 * **Linear Discriminant Analysis (LDA)**
 * **Quadratic Discriminant Analysis (QDA)**
 * División de los datos en conjuntos de entrenamiento y prueba.
-* Evaluación del rendimiento mediante validación sobre datos no utilizados para el entrenamiento.
+* Evaluación del rendimiento sobre datos no utilizados para el entrenamiento.
 
 ## 📈 Resultados
 
@@ -54,7 +54,7 @@ Entre los principales resultados del análisis:
 
 * La reducción de dimensionalidad permitió identificar estructuras latentes relacionadas con las características antropométricas y territoriales de la muestra.
 * El análisis de conglomerados permitió identificar **dos perfiles diferenciados** dentro de la población estudiada.
-* Los modelos discriminantes mostraron una capacidad de clasificación del estado de *stunting* del **82% de acierto** en el conjunto de evaluación.
+* Los modelos discriminantes alcanzaron un **82% de acierto** en la clasificación del estado de *stunting* en el conjunto de evaluación.
 * Las variables antropométricas mostraron una relación especialmente relevante con la clasificación del estado nutricional dentro de los modelos analizados.
 
 ## 🛠️ Tecnologías y herramientas
@@ -62,6 +62,7 @@ Entre los principales resultados del análisis:
 **Lenguaje**
 
 * R
+* R Markdown
 
 **Análisis estadístico**
 
@@ -79,6 +80,21 @@ Entre los principales resultados del análisis:
 * `corrplot`
 * `dendextend`
 
+## 📁 Archivos del proyecto
+
+### 📄 Informe
+
+El informe final con el desarrollo y los resultados del análisis se encuentra en:
+
+👉 [Action_against_hunger.pdf](./Action_against_hunger.pdf)
+
+### 💻 Código
+
+El análisis estadístico completo está desarrollado en **R Markdown**:
+
+👉 [FINAL_CASE_Action_against_hunger.Rmd](./FINAL_CASE_Action_against_hunger.Rmd)
+
+El archivo R Markdown contiene el código utilizado para realizar el preprocesamiento, análisis estadístico, visualización y modelización presentados en el informe.
 
 ## 👥 Autores
 
@@ -93,4 +109,5 @@ Proyecto realizado en el marco del **Grado en Matemáticas de la Universidad de 
 ---
 
 **Proyecto académico — Análisis Estadístico Multivariante**
+
 
