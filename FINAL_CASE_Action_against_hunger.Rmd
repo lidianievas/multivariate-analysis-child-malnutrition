@@ -1,0 +1,2793 @@
+---
+title: "Action Against Hunger"
+author: "María Teresa Torres Aguilar, Lidia Nievas Dueñas, Margarita Conde Jarava, Lucia Tejero Jimenez and Maria del Pilar Caba Magan"
+date: "January, 2026"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+---
+
+## CONTENTS:
+
+##### 1. Introduction
+
+##### 2.Univariate Analysis
+
+##### 3. Multivariate Analysis: PCA
+
+##### 4. Multivariate Analysis: FA
+
+##### 5. Multivariate Analysis: Cluster
+
+##### 6. Multivariate Analysis: DA
+
+<br>
+
+# 1. INTRODUCTION
+
+## 1.1. Packages
+
+```{r, warning=FALSE, message=FALSE}
+
+library(summarytools)
+library(ggplot2)
+library(ggpubr)
+library(foreign) 
+library(readxl) 
+library(archdata)
+library(psych)
+library(factoextra)
+library(scatterplot3d)
+library(reshape2)
+
+library(writexl)
+library(tidyr)
+library(dplyr)
+
+library(corrplot)
+library(corrr)
+library(stats)
+library(psych)
+
+library(tidyverse)
+library(cluster)
+library(ggdendro)
+library(gridExtra)
+
+
+library(ggpubr)
+#library(MVN)
+library(biotools)
+library(klaR)
+library(caret)
+library(MASS)
+```
+
+## 1.2. Import dataset
+
+```{r, warning=FALSE, message=FALSE}
+bbdd_datos<-read_excel("BBDD_Analisis_Final_RECODINGEDITADO.xlsx")
+attach(bbdd_datos)
+```
+
+Before proceeding with the analysis, we must first verify that the selected variables are suitable for factor extraction. This involves testing the underlying assumptions to ensure that the data structure justifies the identification of latent constructs.
+
+```{r, warning=FALSE, message=FALSE}
+SEX<-factor(SEX)
+EDEMA<-factor(EDEMA)
+DIARREA<-factor(DIARREA)
+FIEBRE<-factor(FIEBRE)
+INFEC_RE<-factor(INFEC_RE)
+DESPARAS<-factor(DESPARAS)
+VACC_SAR_AGRUP<-factor(VACC_SAR_AGRUP)
+GAM<-factor(GAM)
+SUNTING<-factor(SUNTING)
+UNDERWEIGHT<-factor(UNDERWEIGHT)
+INTRO_ALIM<-factor(INTRO_ALIM)
+DIET_MIN_ACEP<-factor(DIET_MIN_ACEP)
+HOGAR_A.y<-factor(HOGAR_A.y)
+HOGAR_B<-factor(HOGAR_B)
+HOGAR_C<-factor(HOGAR_C)
+ADULTOS_D<-factor(ADULTOS_D)
+ADULTOS_E<-factor(ADULTOS_E)
+ADULTOS_F<-factor(ADULTOS_F)
+ADULTOS_G<-factor(ADULTOS_G)
+ADULTOS_H<-factor(ADULTOS_H)
+MENORES_I<-factor(MENORES_I)
+MENORES_J<-factor(MENORES_J)
+MENORES_K<-factor(MENORES_K)
+MENORES_L<-factor(MENORES_L)
+MENORES_M<-factor(MENORES_M)
+MENORES_N<-factor(MENORES_N)
+MENORES_O<-factor(MENORES_O)
+EMPLEO_JORNAL_A1<-factor(EMPLEO_JORNAL_A1)
+EMPLEO_OTRO_B1<-factor(EMPLEO_OTRO_B1)
+COMERCIO_C1<-factor(COMERCIO_C1)
+VENTA_PROD_D1<-factor(VENTA_PROD_D1)
+
+```
+
+<br><br><br>
+
+# 2. UNIVARIATE EXPLORATORY ANALYSIS
+
+Numerical and graphical analysis for each variable:
+
+## 2.1. NA: ANALYSIS OF VARIABLES WITH MORE THAN 5% MISSING VALUES (NA)
+
+After cleaning our data, several variables still contain a significant amount of missing values (NA). To correct this in an optimal manner, we must determine whether the missing data is distributed randomly.
+
+To achieve this, we will apply the Student’s t-test to continuous variables or the Chi-squared test to qualitative variables and analyze the resulting p-values.
+
+Let’s proceed:
+
+### Analysis of Continuous Variables
+
+The only variable to be analyzed is MUAC.
+
+Let’s perform the Student’s t-test:
+
+```{r, warning=FALSE, message=FALSE}
+# Create a dummy variable indicating if the data is missing (Missing) or present (Present)
+bbdd_datos$falta_muac <- ifelse(is.na(bbdd_datos$MUAC), "Missing", "Present")
+
+# Run the t-test to check if the missingness follows a random pattern
+# Comparing an auxiliary variable like MONTHS between both groups
+t.test(MONTHS ~ falta_muac, data = bbdd_datos)
+```
+
+The t-test showed a significant difference between participants with missing MUAC data and those with complete data (p \< 0.001). Therefore, missingness is not random, and the median was used for imputation to minimize bias.
+
+```{r, warning=FALSE, message=FALSE}
+# Calculate the median ignoring NAs
+median_muac <- median(bbdd_datos$MUAC, na.rm = TRUE)
+# Replace NAs with the median
+bbdd_datos$MUAC[is.na(bbdd_datos$MUAC)] <- median_muac
+# Verify that no NAs remain
+sum(is.na(bbdd_datos$MUAC))
+
+# 4. Remove the auxiliary columns used for the statistical tests
+bbdd_datos$falta_muac <- NULL
+```
+
+### Analysis of Categorical Variables
+
+In this case, we must analyze the variables VACC_SAR_AGRUP, INTRO_ALIM and DIET_MIN_ACEP. Since these are qualitative variables, we will perform the Chi-squared test.
+
+**Variable VACC_SAR_AGRUP:**
+
+```{r, warning=FALSE, message=FALSE}
+# Create a dummy variable to identify missing values in vaccination data
+bbdd_datos$missing_vacc <- ifelse(is.na(bbdd_datos$VACC_SAR_AGRUP), "Missing", "Present")
+
+# Check frequencies for both groups
+table(bbdd_datos$missing_vacc)
+
+# Create a contingency table between Stratum and Missingness
+contingency_table <- table(bbdd_datos$ESTRATO.x, bbdd_datos$missing_vacc)
+
+# Perform Pearson's Chi-squared test
+chi_test <- chisq.test(contingency_table)
+print(chi_test)
+```
+
+The Chi-squared test for the vaccination variable (VACC_SAR_AGRUP) yielded a p-value of 1.0, indicating that the missing data is distributed randomly across groups. Therefore, missing values were imputed using the mode of the distribution to maintain the sample size without introducing bias.
+
+```{r, warning=FALSE, message=FALSE}
+# 1. Identify the most frequent category (the Mode)
+# We use table() to count and sort() to find the highest value
+vacc_mode <- names(sort(table(bbdd_datos$VACC_SAR_AGRUP), decreasing = TRUE))[1]
+
+# 2. Replace the missing values (NA) with the Mode
+bbdd_datos$VACC_SAR_AGRUP[is.na(bbdd_datos$VACC_SAR_AGRUP)] <- vacc_mode
+
+# 3. Final check to ensure there are no more NAs
+sum(is.na(bbdd_datos$VACC_SAR_AGRUP))
+
+# 4. Remove the auxiliary columns used for the statistical tests
+bbdd_datos$missing_vacc <- NULL
+```
+
+**Variable INTRO_ALIM:**
+
+```{r, warning=FALSE, message=FALSE}
+# Create a dummy variable to identify missing values in vaccination data
+bbdd_datos$missing_intro <- ifelse(is.na(bbdd_datos$INTRO_ALIM), "Missing", "Present")
+
+# Check frequencies for both groups
+table(bbdd_datos$missing_intro)
+
+# Create a contingency table between Stratum and Missingness
+contingency_table <- table(bbdd_datos$ESTRATO.x, bbdd_datos$missing_intro)
+
+# Perform Pearson's Chi-squared test
+chi_test <- chisq.test(contingency_table)
+print(chi_test)
+```
+
+Again, the Chi-squared test for 'intro_alim' resulted in a p-value of 0.1542. Since this value is greater than 0.05, we fail to reject the null hypothesis of independence. This suggests that the data is missing at random (MAR), allowing us to safely impute the missing entries using the mode of the variable.
+
+```{r, warning=FALSE, message=FALSE}
+# 1. Identify the most frequent category (the Mode)
+# We use table() to count and sort() to find the highest value
+vacc_mode <- names(sort(table(bbdd_datos$INTRO_ALIM), decreasing = TRUE))[1]
+
+# 2. Replace the missing values (NA) with the Mode
+bbdd_datos$INTRO_ALIM[is.na(bbdd_datos$INTRO_ALIM)] <- vacc_mode
+
+# 3. Final check to ensure there are no more NAs
+sum(is.na(bbdd_datos$INTRO_ALIM))
+
+# 4. Remove the auxiliary columns used for the statistical tests
+bbdd_datos$missing_intro <- NULL
+```
+
+**Variable DIET_MIN_ACEP:**
+
+```{r, warning=FALSE, message=FALSE}
+# Create a dummy variable to identify missing values in vaccination data
+bbdd_datos$missing_diet <- ifelse(is.na(bbdd_datos$DIET_MIN_ACEP), "Missing", "Present")
+
+# Check frequencies for both groups
+table(bbdd_datos$missing_diet)
+
+# Create a contingency table between Stratum and Missingness
+contingency_table <- table(bbdd_datos$ESTRATO.x, bbdd_datos$missing_diet)
+
+# Perform Pearson's Chi-squared test
+chi_test <- chisq.test(contingency_table)
+print(chi_test)
+```
+
+Again, the Chi-squared test for 'intro_alim' resulted in a p-value of 0.1542. Since this value is greater than 0.05, we fail to reject the null hypothesis of independence. This suggests that the data is missing at random (MAR), allowing us to safely impute the missing entries using the mode of the variable.
+
+```{r, warning=FALSE, message=FALSE}
+# 1. Identify the most frequent category (the Mode)
+# We use table() to count and sort() to find the highest value
+vacc_mode <- names(sort(table(bbdd_datos$DIET_MIN_ACEP), decreasing = TRUE))[1]
+
+# 2. Replace the missing values (NA) with the Mode
+bbdd_datos$DIET_MIN_ACEP[is.na(bbdd_datos$DIET_MIN_ACEP)] <- vacc_mode
+
+# 3. Final check to ensure there are no more NAs
+sum(is.na(bbdd_datos$DIET_MIN_ACEP))
+
+# 4. Remove the auxiliary columns used for the statistical tests
+bbdd_datos$missing_diet <- NULL
+```
+
+<br><br>
+
+## 2.2. Clean dataset with complete cases only:
+
+**Row numbers (observations) excluded due to the presence of at least one missing value (NA):**
+
+Based on the str function output, 137 rows were excluded from the original 704 observations. Consequently, the final dataset consists of **567 observations**.
+
+```{r}
+bbdd_datos_sin_na<-na.omit(bbdd_datos)
+# str(bbdd_datos_sin_na)
+```
+
+Based on the str function output, 137 rows were excluded from the original 704 observations. Consequently, the final dataset consists of **567 observations**.
+
+<br>
+
+For the univariate analysis of the variables, we used the original dataset including NAs to examine the count of missing values in each variable and to obtain an overview of the initial, unaltered data.
+
+<br>
+
+## 2.2. QUANTITATIVE VARIABLES
+
+This section provides a detailed statistical and graphical characterization of the quantitative variables.
+
+First of all, we will compute the mean and standard deviation for all quantitative variables.
+
+```{r, warning=FALSE, message=FALSE}
+vars <- c("ESTRATO.x","CLUSTER.x","MONTHS", "WEIGHT", "HEIGHT", "MUAC","TAMANHO_HOG","MAIZ_A","FRIJOL_B","ELCSA_ADULT_CLASF", "ELCSA_MEN5_CLASF", "NUM_FUENT_INGRES", "CSIr2_OCC", "CSIr2_ORI", "CSI_global")
+
+mean <- sapply(bbdd_datos[vars], mean, na.rm = TRUE)
+sd <- sapply(bbdd_datos[vars], sd, na.rm = TRUE)
+
+final_table <- data.frame(Variable = vars, Mean = mean, Standard_deviation = sd)
+final_table
+```
+
+### Basic descriptive statistics and graphics of ESTRATO.x
+
+```{r, warning=FALSE, message=FALSE}
+summary(ESTRATO.x)
+descr(ESTRATO.x)
+
+# 1. Density plot (p1)
+p1 <- ggplot(bbdd_datos, aes(x = ESTRATO.x)) + 
+  geom_density() + 
+  labs(title = "Density function of ESTRATO.x", x = "ESTRATO.x", y = "Values")
+
+# 2. Histogram (p2)
+p2 <- ggplot(bbdd_datos, aes(x = ESTRATO.x)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of ESTRATO.x", x = "ESTRATO.x", y = "Values")
+
+# 3. Boxplot (p3)
+p3 <- ggplot(bbdd_datos, aes(x = ESTRATO.x)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of ESTRATO.x", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of CLUSTER.x
+
+```{r, warning=FALSE, message=FALSE}
+summary(CLUSTER.x)
+descr(CLUSTER.x)
+
+# 1. Density plot (p1)
+p1 <- ggplot(bbdd_datos, aes(x = CLUSTER.x)) + 
+  geom_density() + 
+  labs(title = "Density function of CLUSTER.x", x = "CLUSTER.x", y = "Values")
+
+# 2. Histogram (p2)
+p2 <- ggplot(bbdd_datos, aes(x = CLUSTER.x)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of CLUSTER.x", x = "CLUSTER.x", y = "Values")
+
+# 3. Boxplot (p3)
+p3 <- ggplot(bbdd_datos, aes(x = CLUSTER.x)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of CLUSTER.x", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of MONTHS
+
+```{r, warning=FALSE, message=FALSE}
+summary(MONTHS)
+descr(MONTHS)
+
+# 1. Density plot (p1)
+p1 <- ggplot(bbdd_datos, aes(x = MONTHS)) + 
+  geom_density() + 
+  labs(title = "Density function of MONTHS", x = "MONTHS", y = "Values")
+
+# 2. Histogram (p2)
+p2 <- ggplot(bbdd_datos, aes(x = MONTHS)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of MONTHS", x = "MONTHS", y = "Values")
+
+# 3. Boxplot (p3)
+p3 <- ggplot(bbdd_datos, aes(x = MONTHS)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of MONTHS", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of WEIGHT
+
+```{r, warning=FALSE, message=FALSE}
+summary(WEIGHT)
+descr(WEIGHT)
+
+# 1. Density plot (p1)
+p1 <- ggplot(bbdd_datos, aes(x = WEIGHT)) + 
+  geom_density() + 
+  labs(title = "Density function of WEIGHT", x = "WEIGHT", y = "Values")
+
+# 2. Histogram (p2)
+p2 <- ggplot(bbdd_datos, aes(x = WEIGHT)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of WEIGHT", x = "WEIGHT", y = "Values")
+
+# 3. Boxplot (p3)
+p3 <- ggplot(bbdd_datos, aes(x = WEIGHT)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of WEIGHT", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of HEIGHT
+
+```{r, warning=FALSE, message=FALSE}
+summary(HEIGHT)
+descr(HEIGHT)
+
+# 1. Density plot (p1) for HEIGHT
+p1 <- ggplot(bbdd_datos, aes(x = HEIGHT)) + 
+  geom_density() + 
+  labs(title = "Density function of HEIGHT", x = "HEIGHT", y = "Values")
+
+# 2. Histogram (p2) for HEIGHT
+p2 <- ggplot(bbdd_datos, aes(x = HEIGHT)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of HEIGHT", x = "HEIGHT", y = "Values")
+
+# 3. Boxplot (p3) for HEIGHT
+p3 <- ggplot(bbdd_datos, aes(x = HEIGHT)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of HEIGHT", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of MUAC
+
+```{r, warning=FALSE, message=FALSE}
+summary(MUAC)
+descr(MUAC)
+
+# 1. Density Plot (p1) for MUAC
+p1 <- ggplot(bbdd_datos, aes(x = MUAC)) + 
+  geom_density() + 
+  labs(title = "Density function of MUAC", x = "MUAC", y = "Values")
+
+# 2. Histogram (p2) for MUAC
+p2 <- ggplot(bbdd_datos, aes(x = MUAC)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of MUAC", x = "MUAC", y = "Values")
+
+# 3. Boxplot (p3) for MUAC
+p3 <- ggplot(bbdd_datos, aes(x = MUAC)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of MUAC", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of TAMANHO_HOG
+
+```{r, warning=FALSE, message=FALSE}
+summary(TAMANHO_HOG)
+descr(TAMANHO_HOG)
+
+# 1. Density Plot (p1) for TAMANHO_HOG
+p1 <- ggplot(bbdd_datos, aes(x = TAMANHO_HOG)) + 
+  geom_density() + 
+  labs(title = "Density function of TAMANHO_HOG", x = "TAMANHO_HOG", y = "Values")
+
+# 2. Histogram (p2) for TAMANHO_HOG
+p2 <- ggplot(bbdd_datos, aes(x = TAMANHO_HOG)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of TAMANHO_HOG", x = "TAMANHO_HOG", y = "Values")
+
+# 3. Boxplot (p3) for TAMANHO_HOG
+p3 <- ggplot(bbdd_datos, aes(x = TAMANHO_HOG)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of TAMANHO_HOG", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of MAIZ_A
+
+```{r, warning=FALSE, message=FALSE}
+summary(MAIZ_A)
+descr(MAIZ_A)
+
+# 1. Density Plot (p1) for MAIZ_A
+p1 <- ggplot(bbdd_datos, aes(x = MAIZ_A)) + 
+  geom_density() + 
+  labs(title = "Density function of MAIZ_A", x = "MAIZ_A", y = "Values")
+
+# 2. Histogram (p2) for MAIZ_A
+p2 <- ggplot(bbdd_datos, aes(x = MAIZ_A)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of MAIZ_A", x = "MAIZ_A", y = "Values")
+
+# 3. Boxplot (p3) for MAIZ_A
+p3 <- ggplot(bbdd_datos, aes(x = MAIZ_A)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of MAIZ_A", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of FRIJOL_B
+
+```{r, warning=FALSE, message=FALSE}
+summary(FRIJOL_B)
+descr(FRIJOL_B)
+
+# 1. Density Plot (p1) for FRIJOL_B
+p1 <- ggplot(bbdd_datos, aes(x = FRIJOL_B)) + 
+  geom_density() + 
+  labs(title = "Density function of FRIJOL_B", x = "FRIJOL_B", y = "Values")
+
+# 2. Histogram (p2) for FRIJOL_B
+p2 <- ggplot(bbdd_datos, aes(x = FRIJOL_B)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of FRIJOL_B", x = "FRIJOL_B", y = "Values")
+
+# 3. Boxplot (p3) for FRIJOL_B
+p3 <- ggplot(bbdd_datos, aes(x = FRIJOL_B)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of FRIJOL_B", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of ELCSA_ADULT_CLASF
+
+```{r, warning=FALSE, message=FALSE}
+summary(ELCSA_ADULT_CLASF)
+descr(ELCSA_ADULT_CLASF)
+
+# 1. Density Plot (p1) for ELCSA_ADULT_CLASF
+p1 <- ggplot(bbdd_datos, aes(x = ELCSA_ADULT_CLASF)) + 
+  geom_density() + 
+  labs(title = "Density function of ELCSA_ADULT_CLASF", x = "ELCSA_ADULT_CLASF", y = "Values")
+
+# 2. Histogram (p2) for ELCSA_ADULT_CLASF
+p2 <- ggplot(bbdd_datos, aes(x = ELCSA_ADULT_CLASF)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of ELCSA_ADULT_CLASF", x = "ELCSA_ADULT_CLASF", y = "Values")
+
+# 3. Boxplot (p3) for ELCSA_ADULT_CLASF
+p3 <- ggplot(bbdd_datos, aes(x = ELCSA_ADULT_CLASF)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of ELCSA_ADULT_CLASF", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+### Basic descriptive statistics and graphics of ELCSA_MEN5_CLASF
+
+```{r, warning=FALSE, message=FALSE}
+summary(ELCSA_MEN5_CLASF)
+descr(ELCSA_MEN5_CLASF)
+
+# 1. Density Plot (p1) for ELCSA_MEN5_CLASF
+p1 <- ggplot(bbdd_datos, aes(x = ELCSA_MEN5_CLASF)) + 
+  geom_density() + 
+  labs(title = "Density function of ELCSA_MEN5_CLASF", x = "ELCSA_MEN5_CLASF", y = "Values")
+
+# 2. Histogram (p2) for ELCSA_MEN5_CLASF
+p2 <- ggplot(bbdd_datos, aes(x = ELCSA_MEN5_CLASF)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of ELCSA_MEN5_CLASF", x = "ELCSA_MEN5_CLASF", y = "Values")
+
+# 3. Boxplot (p3) for ELCSA_MEN5_CLASF
+p3 <- ggplot(bbdd_datos, aes(x = ELCSA_MEN5_CLASF)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of ELCSA_MEN5_CLASF", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+
+```
+
+### Basic descriptive statistics and graphics of NUM_FUENT_INGRES
+
+```{r, warning=FALSE, message=FALSE}
+summary(NUM_FUENT_INGRES)
+descr(NUM_FUENT_INGRES)
+
+# 1. Density Plot (p1) for NUM_FUENT_INGRES
+p1 <- ggplot(bbdd_datos, aes(x = NUM_FUENT_INGRES)) + 
+  geom_density() + 
+  labs(title = "Density function of NUM_FUENT_INGRES", x = "NUM_FUENT_INGRES", y = "Values")
+
+# 2. Histogram (p2) for NUM_FUENT_INGRES
+p2 <- ggplot(bbdd_datos, aes(x = NUM_FUENT_INGRES)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of NUM_FUENT_INGRES", x = "NUM_FUENT_INGRES", y = "Values")
+
+# 3. Boxplot (p3) for NUM_FUENT_INGRES
+p3 <- ggplot(bbdd_datos, aes(x = NUM_FUENT_INGRES)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of NUM_FUENT_INGRES", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+
+```
+
+### Basic descriptive statistics and graphics of CSIr2_OCC
+
+```{r, warning=FALSE, message=FALSE}
+summary(CSIr2_OCC)
+descr(CSIr2_OCC)
+
+# 1. Density Plot (p1) for CSIr2_OCC
+p1 <- ggplot(bbdd_datos, aes(x = CSIr2_OCC)) + 
+  geom_density() + 
+  labs(title = "Density function of CSIr2_OCC", x = "CSIr2_OCC", y = "Values")
+
+# 2. Histogram (p2) for CSIr2_OCC
+p2 <- ggplot(bbdd_datos, aes(x = CSIr2_OCC)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of CSIr2_OCC", x = "CSIr2_OCC", y = "Values")
+
+# 3. Boxplot (p3) for CSIr2_OCC
+p3 <- ggplot(bbdd_datos, aes(x = CSIr2_OCC)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of CSIr2_OCC", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+
+```
+
+### Basic descriptive statistics and graphics of CSIr2_ORI
+
+```{r, warning=FALSE, message=FALSE}
+summary(CSIr2_ORI)
+descr(CSIr2_ORI)
+
+# 1. Density Plot (p1) for CSIr2_ORI
+p1 <- ggplot(bbdd_datos, aes(x = CSIr2_ORI)) + 
+  geom_density() + 
+  labs(title = "Density function of CSIr2_ORI", x = "CSIr2_ORI", y = "Values")
+
+# 2. Histogram (p2) for CSIr2_ORI
+p2 <- ggplot(bbdd_datos, aes(x = CSIr2_ORI)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of CSIr2_ORI", x = "CSIr2_ORI", y = "Values")
+
+# 3. Boxplot (p3) for CSIr2_ORI
+p3 <- ggplot(bbdd_datos, aes(x = CSIr2_ORI)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of CSIr2_ORI", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+
+```
+
+### Basic descriptive statistics and graphics of CSI_global
+
+```{r, warning=FALSE, message=FALSE}
+summary(CSI_global)
+descr(CSI_global)
+
+# 1. Density Plot (p1) for CSI_global
+p1 <- ggplot(bbdd_datos, aes(x = CSI_global)) + 
+  geom_density() + 
+  labs(title = "Density function of CSI_global", x = "CSI_global", y = "Values")
+
+# 2. Histogram (p2) for CSI_global
+p2 <- ggplot(bbdd_datos, aes(x = CSI_global)) + 
+  geom_histogram() + 
+  labs(title = "Histogram of CSI_global", x = "CSI_global", y = "Values")
+
+# 3. Boxplot (p3) for CSI_global
+p3 <- ggplot(bbdd_datos, aes(x = CSI_global)) + 
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, outlier.size = 2) + 
+  coord_flip() + 
+  labs(title = "Boxplot of CSI_global", x = "Values", y = "")
+
+# 4. Arrange the plots
+ggarrange(p1, p2, p3, nrow = 1, common.legend = FALSE)
+```
+
+<br><br>
+
+
+## 2.3. CATEGORICAL VARIABLES
+
+This section provides a detailed statistical and graphical characterization of the categorical variables.
+
+First of all, we will compute a table with % and totals for categorical variables
+
+```{r, warning=FALSE, message=FALSE}
+vars <- c("SEX", "EDEMA", "DIARREA", "FIEBRE", "INFEC_RE", "DESPARAS", "VACC_SAR_AGRUP",  "SUNTING", "GAM", "UNDERWEIGHT", "INTRO_ALIM", "DIET_MIN_ACEP", "HOGAR_A.y", "HOGAR_B", "HOGAR_C", "ADULTOS_D", "ADULTOS_E", "ADULTOS_F", "ADULTOS_G", "ADULTOS_H", "MENORES_I", "MENORES_J", "MENORES_K", "MENORES_L", "MENORES_M", "MENORES_N", "MENORES_O", "EMPLEO_JORNAL_A1", "EMPLEO_OTRO_B1", "COMERCIO_C1", "VENTA_PROD_D1")
+categoricals_var <- bbdd_datos[vars]
+freq(categoricals_var, cumul = FALSE)
+```
+
+
+### Basic descriptive statistics and graphics of SEX
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(SEX)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(SEX)))+geom_bar()+ coord_polar("y")+labs(x="SEX",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(SEX)))+geom_bar()+labs(x="SEX",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of EDEMA
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(EDEMA)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(EDEMA)))+geom_bar()+ coord_polar("y")+labs(x="EDEMA",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(EDEMA)))+geom_bar()+labs(x="EDEMA",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of DIARREA
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(DIARREA)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(DIARREA)))+geom_bar()+ coord_polar("y")+labs(x="DIARREA",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(DIARREA)))+geom_bar()+labs(x="DIARREA",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of FIEBRE
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(FIEBRE)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(FIEBRE)))+geom_bar()+ coord_polar("y")+labs(x="FIEBRE",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(FIEBRE)))+geom_bar()+labs(x="FIEBRE",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of INFEC_RE
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(INFEC_RE)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(INFEC_RE)))+geom_bar()+ coord_polar("y")+labs(x="INFEC_RE",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(INFEC_RE)))+geom_bar()+labs(x="INFEC_RE",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of DESPARAS
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(DESPARAS)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(DESPARAS)))+geom_bar()+ coord_polar("y")+labs(x="DESPARAS",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(DESPARAS)))+geom_bar()+labs(x="DESPARAS",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of VACC_SAR_AGRUP
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(VACC_SAR_AGRUP)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(VACC_SAR_AGRUP)))+geom_bar()+ coord_polar("y")+labs(x="VACC_SAR_AGRUP",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(VACC_SAR_AGRUP)))+geom_bar()+labs(x="VACC_SAR_AGRUP",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of GAM
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(GAM)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(GAM)))+geom_bar()+ coord_polar("y")+labs(x="GAM",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(GAM)))+geom_bar()+labs(x="GAM",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of SUNTING
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(SUNTING)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(SUNTING)))+geom_bar()+ coord_polar("y")+labs(x="SUNTING",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(SUNTING)))+geom_bar()+labs(x="SUNTING",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of UNDERWEIGHT
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(UNDERWEIGHT)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(UNDERWEIGHT)))+geom_bar()+ coord_polar("y")+labs(x="UNDERWEIGHT",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(UNDERWEIGHT)))+geom_bar()+labs(x="UNDERWEIGHT",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of INTRO_ALIM
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(INTRO_ALIM)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(INTRO_ALIM)))+geom_bar()+ coord_polar("y")+labs(x="INTRO_ALIM",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(INTRO_ALIM)))+geom_bar()+labs(x="INTRO_ALIM",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of DIET_MIN_ACEP
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(DIET_MIN_ACEP)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(DIET_MIN_ACEP)))+geom_bar()+ coord_polar("y")+labs(x="DIET_MIN_ACEP",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(DIET_MIN_ACEP)))+geom_bar()+labs(x="DIET_MIN_ACEP",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of HOGAR_A.y
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(HOGAR_A.y)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(HOGAR_A.y)))+geom_bar()+ coord_polar("y")+labs(x="HOGAR_A.y",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(HOGAR_A.y)))+geom_bar()+labs(x="HOGAR_A.y",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of HOGAR_B
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(HOGAR_B)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(HOGAR_B)))+geom_bar()+ coord_polar("y")+labs(x="HOGAR_B",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(HOGAR_B)))+geom_bar()+labs(x="HOGAR_B",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of HOGAR_C
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(HOGAR_C)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(HOGAR_C)))+geom_bar()+ coord_polar("y")+labs(x="HOGAR_C",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(HOGAR_C)))+geom_bar()+labs(x="HOGAR_C",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of ADULTOS_D
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(ADULTOS_D)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(ADULTOS_D)))+geom_bar()+ coord_polar("y")+labs(x="ADULTOS_D",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(ADULTOS_D)))+geom_bar()+labs(x="ADULTOS_D",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of ADULTOS_E
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(ADULTOS_E)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(ADULTOS_E)))+geom_bar()+ coord_polar("y")+labs(x="ADULTOS_E",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(ADULTOS_E)))+geom_bar()+labs(x="ADULTOS_E",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of ADULTOS_F
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(ADULTOS_F)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(ADULTOS_F)))+geom_bar()+ coord_polar("y")+labs(x="ADULTOS_F",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(ADULTOS_F)))+geom_bar()+labs(x="ADULTOS_F",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of ADULTOS_G
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(ADULTOS_G)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(ADULTOS_G)))+geom_bar()+ coord_polar("y")+labs(x="ADULTOS_G",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(ADULTOS_G)))+geom_bar()+labs(x="ADULTOS_G",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of ADULTOS_H
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(ADULTOS_H)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(ADULTOS_H)))+geom_bar()+ coord_polar("y")+labs(x="ADULTOS_H",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(ADULTOS_H)))+geom_bar()+labs(x="ADULTOS_H",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_I
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_I)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_I)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_I",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_I)))+geom_bar()+labs(x="MENORES_I",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_J
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_J)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_J)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_J",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_J)))+geom_bar()+labs(x="MENORES_J",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_K
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_K)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_K)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_K",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_K)))+geom_bar()+labs(x="MENORES_K",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_L
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_L)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_L)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_L",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_L)))+geom_bar()+labs(x="MENORES_L",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_M
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_M)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_M)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_M",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_M)))+geom_bar()+labs(x="MENORES_M",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_N
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_N)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_N)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_N",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_N)))+geom_bar()+labs(x="MENORES_N",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of MENORES_O
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(MENORES_O)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(MENORES_O)))+geom_bar()+ coord_polar("y")+labs(x="MENORES_O",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(MENORES_O)))+geom_bar()+labs(x="MENORES_O",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of EMPLEO_JORNAL_A1
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(EMPLEO_JORNAL_A1)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(EMPLEO_JORNAL_A1)))+geom_bar()+ coord_polar("y")+labs(x="EMPLEO_JORNAL_A1",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(EMPLEO_JORNAL_A1)))+geom_bar()+labs(x="EMPLEO_JORNAL_A1",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of EMPLEO_OTRO_B1
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(EMPLEO_OTRO_B1)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(EMPLEO_OTRO_B1)))+geom_bar()+ coord_polar("y")+labs(x="EMPLEO_OTRO_B1",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(EMPLEO_OTRO_B1)))+geom_bar()+labs(x="EMPLEO_OTRO_B1",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of COMERCIO_C1
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(COMERCIO_C1)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(COMERCIO_C1)))+geom_bar()+ coord_polar("y")+labs(x="COMERCIO_C1",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(COMERCIO_C1)))+geom_bar()+labs(x="COMERCIO_C1",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+### Basic descriptive statistics and graphics of VENTA_PROD_D1
+
+Frequency table:
+
+```{r, warning=FALSE, message=FALSE}
+freq(VENTA_PROD_D1)
+```
+
+Pie chart and bar graph:
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos, aes(x=factor(1) ,fill=factor(VENTA_PROD_D1)))+geom_bar()+ coord_polar("y")+labs(x="VENTA_PROD_D1",y="%")
+
+p2<-ggplot(bbdd_datos,aes(x=factor(1),fill=factor(VENTA_PROD_D1)))+geom_bar()+labs(x="VENTA_PROD_D1",y="%")
+
+ggarrange(p1,p2, nrow=1, ncol=2, common.legend = TRUE)
+```
+
+<br><br>
+
+
+## 2. 4. OUTLIERS
+
+### Indentify and elimination of outliers:
+
+As previously observed, some of the quantitative variables contain outliers that could lead to errors during our study. We will identify these outliers and replace them in each case with the values that best suit the distribution.
+
+#### Boxplots of all variables together
+
+```{r, warning=FALSE, message=FALSE}
+# Define the list of variables to plot
+target_vars <- c("CLUSTER.x", "MONTHS", "WEIGHT", "HEIGHT", "MUAC", "TAMANHO_HOG", "MAIZ_A", "FRIJOL_B", "ELCSA_ADULT_CLASF","ELCSA_MEN5_CLASF", "NUM_FUENT_INGRES", "CSIr2_OCC", "CSIr2_ORI", "CSI_global")
+
+# This visualization is not the best due to the difference between the scales:
+boxplot(bbdd_datos[target_vars],main="Outliers",
+xlab="All explanatory variables",
+ylab="Values",
+col=c(2:8,2:8,2,3))
+```
+
+However, if the quantitative variables are standardized, the effect of scales differences is erased. This joint boxplots output is more informative.
+
+```{r, warning=FALSE, message=FALSE}
+#Standardization
+sca<-scale(bbdd_datos[target_vars])
+# Boxplots of all variables together
+# This visualization is not affected by the difference between the scales
+boxplot(sca,main="Outliers",
+xlab="All explanatory variables",
+ylab="Values",
+col=c(2:8,2:8,2,3))
+```
+
+#### Individuals boxplots
+
+```{r, warning=FALSE, message=FALSE}
+p1<-ggplot(bbdd_datos,aes(x=CLUSTER.x))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of CLUSTER.x",x="Values",y="")
+p2<-ggplot(bbdd_datos,aes(x=MONTHS))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of MONTHS",x="Values",y="")
+p3<-ggplot(bbdd_datos,aes(x=WEIGHT))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of WEIGHT",x="Values",y="")
+p4<-ggplot(bbdd_datos,aes(x=HEIGHT))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of HEIGHT",x="Values",y="")
+p5<-ggplot(bbdd_datos,aes(x=MUAC))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of MUAC",x="Values",y="")
+p6<-ggplot(bbdd_datos,aes(x=TAMANHO_HOG))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of TAMANHO_HOG",x="Values",y="")
+p7<-ggplot(bbdd_datos,aes(x=MAIZ_A))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of MAIZ_A",x="Values",y="")
+p8<-ggplot(bbdd_datos,aes(x=FRIJOL_B))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of FRIJOL_B",x="Values",y="")
+p9<-ggplot(bbdd_datos,aes(x=ELCSA_ADULT_CLASF))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of ELCSA_ADULT_CLASF",x="Values",y="")
+p10<-ggplot(bbdd_datos,aes(x=ELCSA_MEN5_CLASF))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of ELCSA_MEN5_CLASF",x="Values",y="")
+p11<-ggplot(bbdd_datos,aes(x=NUM_FUENT_INGRES))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of NUM_FUENT_INGRES",x="Values",y="")
+p12<-ggplot(bbdd_datos,aes(x=CSIr2_OCC))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of CSIr2_OCC",x="Values",y="")
+p13<-ggplot(bbdd_datos,aes(x=CSIr2_ORI))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of CSIr2_ORI",x="Values",y="")
+p14<-ggplot(bbdd_datos,aes(x=CSI_global))+
+  geom_boxplot(outlier.colour="red", outlier.shape=1,outlier.size=2)+
+  coord_flip()+labs(title = "Boxplot of CSI_global",x="Values",y="")
+
+
+# juntarlos todos: 
+ggarrange(p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14, nrow=4, ncol=4, 
+          commond.legend=FALSE)
+```
+
+Based on the boxplots obtained previously, we can observe that outliers are present in WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A, FRIJOL_B and NUM_FUENT_INGRES. Therefore, we will focus our analysis on these specific variables.
+
+<br>
+
+#### Univariate visual exploratory analysis
+
+```{r, warning=FALSE, message=FALSE}
+# Create individual plots for each variable grouped by Stratum (ESTRATO.x)
+p1 <- ggplot(bbdd_datos, aes(x = WEIGHT, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+      labs(title = "WEIGHT Distribution by Stratum", fill = "Stratum")
+
+p2 <- ggplot(bbdd_datos, aes(x = HEIGHT, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+      labs(title = "Height Distribution by Stratum", fill = "Stratum")
+
+p3 <- ggplot(bbdd_datos, aes(x = MUAC, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+      labs(title = "MUAC Distribution by Stratum", fill = "Stratum")
+
+p4 <- ggplot(bbdd_datos, aes(x = TAMANHO_HOG, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 15) +
+      labs(title = "Household Size by Stratum", fill = "Stratum")
+
+p5 <- ggplot(bbdd_datos, aes(x = MAIZ_A, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+      labs(title = "Maize Consumption by Stratum", fill = "Stratum")
+
+p6 <- ggplot(bbdd_datos, aes(x = FRIJOL_B, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+      labs(title = "Beans Consumption by Stratum", fill = "Stratum")
+
+p7 <- ggplot(bbdd_datos, aes(x = NUM_FUENT_INGRES, fill = as.factor(ESTRATO.x))) +
+      geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+      labs(title = "Beans Consumption by Stratum", fill = "Stratum")
+
+# This function controls the graphical output device
+ggarrange(p1,p2,p3,p4,p5,p6,p7, nrow = 3, ncol=3, common.legend = TRUE)
+```
+
+#### Bivariate visual exploratory analysis
+
+```{r, warning=FALSE, message=FALSE}
+# Scatter plots for each pair of variable combinations
+pairs(x = bbdd_datos[,target_vars],
+col = c("red","blue")[bbdd_datos$ESTRATO.x], pch = 19)
+```
+
+#### Trivariate visual exploratory analysis
+
+Finally, we implemented 3D scatter plots to assess some combinations of three variables can effectively separate the two sites. By moving beyond two dimensions, we can identify spatial clusters that univariate or bivariate analyses might miss. This multidimensional approach helps determine which feature sets are the best candidates for building an accurate classification model.
+
+```{r, warning=FALSE, message=FALSE}
+# 3D scatter plot for the variables WEIGHT, HEIGHT and MUAC
+scatterplot3d(WEIGHT, HEIGHT, MUAC,
+color = c("firebrick", "green3")[bbdd_datos$ESTRATO.x],pch = 19,
+grid = TRUE, xlab = "WEIGHT", ylab = "HEIGHT",
+zlab = "MUAC", angle = 65, cex.axis = 0.6)
+legend("topleft",
+bty = "n", cex = 0.8,
+title = "ESTRATO.x",c("1", "2"), fill = c("firebrick", "green3"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+# 3D scatter plot for the variables TAMANHO_HOG, MAIZ_A and FRIJO_B
+scatterplot3d(TAMANHO_HOG, MAIZ_A, FRIJOL_B,
+color = c("firebrick", "green3")[bbdd_datos$ESTRATO.x],pch = 19,
+grid = TRUE, xlab = "TAMANHO_HOG", ylab = "MAIZ_A",
+zlab = "FRIJOL_B", angle = 65, cex.axis = 0.6)
+legend("topleft",
+bty = "n", cex = 0.8,
+title = "ESTRATO.x",c("1", "2"), fill = c("firebrick", "green3"))
+```
+
+```{r, warning=FALSE, message=FALSE}
+# 3D scatter plot for the variables HEIGHT, MUAC and MAIZ_A
+scatterplot3d(HEIGHT, MUAC, MAIZ_A,
+color = c("firebrick", "green3")[bbdd_datos$ESTRATO.x],pch = 19,
+grid = TRUE, xlab = "HEIGHT", ylab = "MUAC",
+zlab = "MAIZ_A", angle = 65, cex.axis = 0.6)
+legend("topleft",
+bty = "n", cex = 0.8,
+title = "ESTRATO.x",c("1", "2"), fill = c("firebrick", "green3"))
+```
+
+#### Making decisions
+
+Based on the previous graphical outputs, outliers were identified in the variables WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A, FRIJOL_B and NUM_FUENT_INGRES. It is crucial to address these values because multivariate methods, such as Principal Component Analysis (PCA), are highly sensitive to extreme observations.
+
+Handling outliers is a complex task that ideally requires a case-by-case analysis. However, as the objective of this study is to introduce the preliminary steps of exploratory data analysis and data preparation, the decision was made to replace these outliers with the median of their respective variables to ensure a more robust distribution.
+
+```{r, warning=FALSE, message=FALSE}
+# Function that modifies outliers by the mean of their variable
+clean_outliers <- function(x) {
+  x <- as.numeric(x)
+  for(i in 1:10) {
+    q <- quantile(x, probs = c(0.25, 0.75), na.rm = TRUE)
+    iqr_val <- q[2] - q[1]
+    lower <- q[1] - 1.5 * iqr_val
+    upper <- q[2] + 1.5 * iqr_val
+    outliers <- x < lower | x > upper
+    if(!any(outliers, na.rm = TRUE)) break
+    x[outliers] <- NA
+    x[is.na(x)] <- mean(x, na.rm = TRUE)
+  }
+  return(x)
+}
+
+# This data.frame is to preserve original data once the outliers are modified
+bbdd_datos_aux <- bbdd_datos_sin_na
+
+
+variables_outliers <- c("WEIGHT", "HEIGHT", "MUAC", "TAMANHO_HOG", "MAIZ_A", "FRIJOL_B")
+
+#Called to outlier function for each variable identified with outliers
+for(var in variables_outliers) {
+  bbdd_datos_aux[[var]] <- clean_outliers(bbdd_datos_aux[[var]])
+  print(paste("Variable cleaned:", var))
+}
+
+par(mar=c(8, 4, 4, 2) + 0.1) 
+
+# Boxplots of all quantitative variables together once outliers are dealt with
+#Standardization
+bbdd_datos_sca<-bbdd_datos_aux[variables_outliers]
+
+sca<-scale(bbdd_datos_sca)
+
+# Boxplots of all variables together
+# This visualization is not affected by the difference between the scales
+boxplot(sca,main="Outliers",
+xlab="All explanatory variables",
+ylab="Values", 
+col=c(2:8,2:4))
+```
+
+Outlier removal was not performed for the NUM_FUENT_INGRES variable, as doing so would result in all observations taking a value of 1. This would lead to a complete loss of information for this variable; therefore, it is used in its original form (except for the exclusion of missing values).
+
+In the initial analysis, removing the outliers in NUM_FUENT_INGRES, results in a dispersion of zero. Consequently, the data cannot be normalized, as division by zero is a mathematically undefined operation.
+
+As a final preparatory step, we have handled any remaining missing values (NAs) to ensure a complete-case dataset. This process is essential to maintain the integrity of the subsequent multivariate analysis, preventing potential computational errors and ensuring the stability of the estimated models.
+
+```{r, warning=FALSE, message=FALSE}
+
+# str(bbdd_datos_aux)
+# bbdd_datos_last<-na.omit(bbdd_datos_aux)  hecho antes 
+
+bbdd_datos_last<-bbdd_datos_aux
+bbdd_datos_last
+attach(bbdd_datos_last)
+
+```
+
+<br><br>
+
+## 2.5. ASSUMPTION OF NORMALITY
+
+To conduct the normality analysis using Q-Q (quantile-quantile) plots in R, you can follow these steps. First, we identify the continuous variables which could have normality in your dataset (MONTHS, WEIGHT, HEIGHT, and MUAC), and then we apply the corresponding plotting functions.
+
+```{r}
+# Prepare the data: convert from wide to long format for simultaneous plotting
+long_data <- bbdd_datos_last %>%
+  dplyr::select(MONTHS, WEIGHT, HEIGHT, MUAC) %>%
+  pivot_longer(cols = everything(), names_to = "Variable", values_to = "Value")
+
+# Create Faceted Q-Q Plots
+ggplot(long_data, aes(sample = Value)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  facet_wrap(~Variable, scales = "free") +
+  theme_minimal() +
+  labs(
+    title = "Normality Analysis (Q-Q Plots)",
+    subtitle = "Continuous Variables from the Dataset",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  )
+```
+
+**Shapiro test**
+
+The null hypothesis that the data follow a univariate normal distribution is tested. This hypothesis is rejected if the p-value given by the Shapiro-Wilk test is less than 0.05. Otherwise the assumption of normality of the data is not rejectected.
+
+```{r}
+datos_para_test <- bbdd_datos_last[, c("ESTRATO.x", "MONTHS", "WEIGHT", "HEIGHT", "MUAC")]
+
+datos_tidy <- melt(datos_para_test, id.vars = "ESTRATO.x")
+
+shapiro_results <- aggregate(value ~ ESTRATO.x + variable, 
+                             data = datos_tidy, 
+                             FUN = function(z) shapiro.test(z)$p.value)
+
+names(shapiro_results)[3] <- "p_value"
+print(shapiro_results)
+```
+
+The Q-Q plots for the continuous variables (HEIGHT, MONTHS, MUAC, and WEIGHT) reveal that while the data points generally align with the theoretical normal line in the central range, there are visible deviations at the tails. Specifically, variables like MONTHS and HEIGHT show a 'plateau' effect at the upper end, suggesting a light-tailed distribution or a truncated range in the sample. Since perfect normality is not observed, we should proceed with caution when using parametric tests. However, the alignment in the center is sufficient to suggest that these variables can still be used for multivariate analysis, provided that robust methods or appropriate transformations are considered to mitigate the influence of the non-normal tails.
+
+The null hypothesis that the data follow a univariate normal distribution is tested. This hypothesis is rejected if the p-value given by the Shapiro-Wilk test is less than 0.05. Otherwise the assumption of normality of the data is not rejected.
+
+<br><br><br>
+
+# 3. MULTIVARIATE ANALYSIS: PCA
+
+Based on our study, one of the initial steps in multivariate analysis is dimensionality reduction. We have decided to perform Principal Component Analysis (PCA) and Factor Analysis (FA) in parallel.
+
+Two distinct sets of variables have been selected, and both techniques will be applied to each. This allows us to leverage the insights gained from each method to compare them and make an optimal decision regarding which variables to retain for dimensionality reduction.
+
+Specifically, for the PCA, we extracted the numerical variables from the latest dataset. Furthermore, the data are standardized, as this is a necessary prerequisite for performing this analysis.
+
+**Prior to the study:** A new spreadsheet was created to ensure a clean workspace and optimize memory usage from the outset:
+
+```{r}
+write_xlsx(bbdd_datos_last, path = "bbdd_datos_LAST.xlsx")
+
+bbdd_last<-read_excel("bbdd_datos_LAST.xlsx")
+
+rm(list = ls())
+bbdd_last<-read_excel("bbdd_datos_LAST.xlsx")
+
+# str(bbdd_last)
+```
+
+<br>
+
+## 3.1. VARIABLE SELECTION BASED ON KMO TEST: ESTRATO.x, MONTHS, WEIGHT, HEIGHT, MUAC AND NUM_FUENT_INGRES.
+
+From the set of all numerical variables, the KMO test values for each individual variable are used to identify which are most suitable for our Principal Component Analysis. Those with a value below 0.5 are removed, as they would hinder the quality of the analysis.
+
+```{r, warning=FALSE, message=FALSE}
+attach(bbdd_last)
+
+# new dataset containing only the quantitative variables: 
+bbdd_last_num<-data.frame(ESTRATO.x, CLUSTER.x, MONTHS, WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A, FRIJOL_B, NUM_FUENT_INGRES)
+
+str(bbdd_last_num)
+```
+
+### CORRELATION MATRIX AND BARTLETT'S TEST:
+
+First, the correlation matrix is computed, and it is also examined graphically.
+
+```{r, warning=FALSE, message=FALSE}
+correlation_matrix<-cor(bbdd_last_num) 
+correlation_matrix
+det(correlation_matrix)
+```
+
+```{r, warning=FALSE, message=FALSE}
+
+corrplot(cor(bbdd_last_num), 
+        order = "hclust", tl.col='black', tl.cex=1)
+
+rplot(correlation_matrix, legend = TRUE, colours = c("firebrick1", "black","darkcyan"),
+print_cor = TRUE)
+```
+
+Evidently, a strong correlation is observed between the variables MONTHS, WEIGHT, and HEIGHT.
+
+```{r, warning=FALSE, message=FALSE}
+cor(bbdd_last_num$MONTHS, bbdd_last_num$HEIGHT)
+cor(bbdd_last_num$MONTHS, bbdd_last_num$WEIGHT)
+cor(bbdd_last_num$WEIGHT, bbdd_last_num$HEIGHT)
+```
+
+**Bartlett's sphericity test:**
+
+Bartlett's test of sphericity indicates whether there is sufficient correlation among the variables to proceed with the analysis.
+
+This test checks whether the correlations are significantly different from 0. The null hypothesis is H_0; det(R)=1 means the variables are uncorrelated (R denotes the correlation matrix)
+
+```{r, warning=FALSE, message=FALSE}
+# This function works with standardized data.
+bbdd_last_num_scale<-scale(bbdd_last_num)
+# Bartlett's sphericity test
+cortest.bartlett(cor(bbdd_last_num_scale), n=nrow(bbdd_last_num))
+```
+
+Once it is established that the necessary conditions for the study are met, we examine the KMO individual values for each variable to assess their suitability for the analysis.
+
+```{r, warning=FALSE, message=FALSE}
+KMO(bbdd_last_num_scale)
+```
+
+The overall MSA (Measure of Sampling Adequacy) value of 0.72 indicates that the analysis is acceptable/good. This implies that while the set of variables is valid, it is not optimal, as certain variables are penalizing the results.
+
+Based on the individual MSA values, variables with scores below 0.5 are considered problematic: CLUSTER.x, MAIZ_A, FRIJOL_B, and especially TAMANHO_HOG, which shows very poor adequacy. Consequently, for the PCA, we have excluded CLUSTER.x, MAIZ_A, FRIJOL_B, and TAMANHO_HOG. However, we have chosen to retain ESTRATO.x, as we consider this variable to provide greater analytical value.
+
+```{r, warning=FALSE, message=FALSE}
+# Reduced dataset:
+bbdd_last_num2<-data.frame(ESTRATO.x, MONTHS, WEIGHT, HEIGHT, MUAC, NUM_FUENT_INGRES)
+```
+
+### CORRELATION MATRIX
+
+```{r}
+correlation_matrix2<-cor(bbdd_last_num2) 
+correlation_matrix2
+det(correlation_matrix2)
+
+bbdd_last_num_scale2<-scale(bbdd_last_num2)
+```
+
+### BARTLETT'S TEST AND KMO
+
+This confirms that we have retained the most suitable variables for the analysis.
+
+```{r}
+cortest.bartlett(cor(bbdd_last_num_scale2), n=nrow(bbdd_last_num_scale2))
+
+KMO(bbdd_last_num_scale2)
+```
+
+### Principal components
+
+Once the preliminary checks are completed, we obtain the principal components, which constitute our new coordinate system.
+
+```{r, warning=FALSE, message=FALSE}
+
+PCA<-prcomp(bbdd_last_num2, scale=T, center = T)
+
+# Coefficients of the principal components:
+# Indicates the weight of each variable in the corresponding principal component
+PCA$rotation
+
+# Standard deviations of each principal component:
+PCA$sdev
+
+# Relevant information:
+# - Standard deviations of each principal component
+# - Proportion of variance explained and cummulative variance
+summary(PCA)
+```
+
+### graph of the proportion of explained variance:
+
+```{r, warning=FALSE, message=FALSE}
+sdev <- PCA$sdev
+Explained_variance <- sdev*sdev / sum(sdev*sdev)
+
+p1<-ggplot(data = data.frame(Explained_variance, pc = 1:6),
+aes(x = pc, y = Explained_variance, fill=Explained_variance )) +
+geom_col(width = 0.3) + scale_y_continuous(limits = c(0,0.6)) + theme_bw() +
+labs(x = "Principal component", y= "Proportion of variance")
+
+p1
+```
+
+### graph of the proportion of cumulative explained variance:
+
+```{r}
+Cummulative_variance<-cumsum(Explained_variance)
+p2<-ggplot( data = data.frame(Cummulative_variance, pc = 1:6),
+aes(x = pc, y = Cummulative_variance ,fill=Cummulative_variance )) +
+geom_col(width = 0.5) + scale_y_continuous(limits = c(0,1)) + theme_bw() +
+labs(x = "Principal component",
+y = "Proportion of cumulative variance")
+
+p2
+```
+
+### RULE OF ABDI ET AL.:
+
+prcomp() returns sdev, a vector containing the standard deviations of each principal component. From these, the variances (eigenvalues) are first derived. Subsequently, we retain only those components with variances greater than or equal to the average variance. (In the case of standardized variables like this one, the average variance is 1).
+
+```{r, warning=FALSE, message=FALSE}
+# Variances
+sdev*sdev
+# Average of variances
+mean(sdev*sdev)
+```
+
+Consequently, following this criterion, we keep the first two or three components.
+
+<br>
+
+**PCA graphical outputs of interest**
+
+```{r, warning=FALSE, message=FALSE}
+# These graphical outputs show the projection of the variables in two dimensions
+
+# Display the weight of the variable in the direction of the principal component
+
+p1<-fviz_pca_var(PCA,repel=TRUE,col.var="cos2",
+legend.title="Distance", title="Variables")+theme_bw()
+p2<-fviz_pca_var(PCA,axes=c(1,3),repel=TRUE,col.var="cos2",
+legend.title="Distance", title="Variables")+theme_bw()
+p3<-fviz_pca_var(PCA,axes=c(2,3),repel=TRUE,col.var="cos2",
+legend.title="Distance", title="Variables")+theme_bw()
+# Displaying graphics
+p1
+p2
+p3
+```
+
+**Observations and variance contribution:** These graphical outputs show the observations with their variance contribution.
+
+```{r, warning=FALSE, message=FALSE}
+# It is also possible to represent the observations
+
+# As well as identify with colors those observations that explain the greatest
+
+# variance of the principal components
+
+p1<-fviz_pca_ind(PCA,col.ind = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel=TRUE,legend.title="Contrib.var", title="Records")+theme_bw()
+p2<-fviz_pca_ind(PCA,axes=c(1,3),col.ind = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel=TRUE,legend.title="Contrib.var", title="Records")+theme_bw()
+p3<-fviz_pca_ind(PCA,axes=c(2,3),col.ind = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel=TRUE,legend.title="Contrib.var", title="Records")+theme_bw()
+# Displaying graphics
+p1
+p2
+p3
+```
+
+**Observations and variables with variance contribution:**
+
+These graphical outputs show observations and the variables with their variance contribution.
+
+```{r, warning=FALSE, message=FALSE}
+# Joint representation of variables and observations
+# Relates the possible relationships between the contributions of the records
+# to the variances of the components and the weight of the variables in each
+# principal component
+p1<-fviz_pca(PCA,alpha.ind ="contrib", col.var = "cos2",
+col.ind="seagreen",
+gradient.cols = c("#FDF50E", "#FD960E", "#FD1E0E"),
+repel=TRUE, legend.title="Distance")+theme_bw()
+p2<-fviz_pca(PCA,axes=c(1,3),alpha.ind ="contrib",
+col.var = "cos2",col.ind="seagreen",
+gradient.cols = c("#FDF50E", "#FD960E", "#FD1E0E"),
+repel=TRUE, legend.title="Distance")+theme_bw()
+p3<-fviz_pca(PCA,axes=c(2,3),alpha.ind ="contrib",
+col.var = "cos2",col.ind="seagreen",
+gradient.cols = c("#FDF50E", "#FD960E", "#FD1E0E"),
+repel=TRUE, legend.title="Distance")+theme_bw()
+# Displaying graphics
+p1
+p2
+p3
+```
+
+**Coordinates in the new reference system** Finally, since the object of this study was to reduce the dimension of the data set, it is possible to obtain the coordinates of the original data in the new reference system. In fact, they are stored since we used the prcomp function to create the PCA variable.
+
+```{r, warning=FALSE, message=FALSE}
+head(PCA$x)
+```
+
+<br><br>
+
+## 3.2. GROUP 2: CLUSTER.X, MONTHS, WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A AND FRIJOL_B
+
+The same study was conducted for the second group of variables, which was selected based on the Factor Analysis criteria.
+
+```{r, warning=FALSE, message=FALSE}
+# Reduced dataset:
+bbdd_last_num3<-data.frame(CLUSTER.x, MONTHS, WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A, FRIJOL_B)
+```
+
+### CORRELATION MATRIX
+
+```{r}
+correlation_matrix3<-cor(bbdd_last_num3) 
+correlation_matrix3
+det(correlation_matrix3)
+
+bbdd_last_num_scale3<-scale(bbdd_last_num3)
+```
+
+```{r, warning=FALSE, message=FALSE}
+corrplot(cor(bbdd_last_num3), order = "hclust", tl.col='black', tl.cex=1)
+
+rplot(correlation_matrix3, legend = TRUE, colours = c("firebrick1", "black","darkcyan"),
+print_cor = TRUE)
+```
+
+### BARTLETT'S TEST AND KMO
+
+```{r}
+cortest.bartlett(cor(bbdd_last_num_scale3), n=nrow(bbdd_last_num_scale3))
+
+KMO(bbdd_last_num_scale3)
+```
+
+### Principal components
+
+```{r, warning=FALSE, message=FALSE}
+PCA<-prcomp(bbdd_last_num3, scale=T, center = T)
+
+# Coefficients of the principal components:
+# Indicates the weight of each variable in the corresponding principal component
+PCA$rotation
+
+# Standard deviations of each principal component:
+PCA$sdev
+
+# Relevant information:
+# - Standard deviations of each principal component
+# - Proportion of variance explained and cummulative variance
+summary(PCA)
+```
+
+### graph of the proportion of explained variance:
+
+```{r, warning=FALSE, message=FALSE}
+sdev <- PCA$sdev
+Explained_variance <- sdev*sdev / sum(sdev*sdev)
+
+p1<-ggplot(data = data.frame(Explained_variance, pc = 1:length(Explained_variance)),
+aes(x = pc, y = Explained_variance, fill=Explained_variance )) +
+geom_col(width = 0.3) + scale_y_continuous(limits = c(0,0.6)) + theme_bw() +
+labs(x = "Principal component", y= "Proportion of variance")
+
+p1
+```
+
+### graph of the proportion of cumulative explained variance:
+
+```{r}
+Cummulative_variance<-cumsum(Explained_variance)
+p2<-ggplot( data = data.frame(Cummulative_variance, pc = 1:length(Explained_variance)),
+aes(x = pc, y = Cummulative_variance ,fill=Cummulative_variance )) +
+geom_col(width = 0.5) + scale_y_continuous(limits = c(0,1)) + theme_bw() +
+labs(x = "Principal component",
+y = "Proportion of cumulative variance")
+
+p2
+```
+
+### RULE OF ABDI ET AL.:
+
+```{r message=FALSE, warning=FALSE}
+# Variances
+sdev*sdev
+# Average of variances
+mean(sdev*sdev)
+```
+
+In this case, we retain the first four principal components.
+
+**PCA graphical outputs of interest**
+
+```{r, warning=FALSE, message=FALSE}
+# These graphical outputs show the projection of the variables in two dimensions
+
+# Display the weight of the variable in the direction of the principal component
+
+p1<-fviz_pca_var(PCA,repel=TRUE,col.var="cos2",
+legend.title="Distance", title="Variables")+theme_bw()
+p2<-fviz_pca_var(PCA,axes=c(1,3),repel=TRUE,col.var="cos2",
+legend.title="Distance", title="Variables")+theme_bw()
+p3<-fviz_pca_var(PCA,axes=c(2,3),repel=TRUE,col.var="cos2",
+legend.title="Distance", title="Variables")+theme_bw()
+# Displaying graphics
+p1
+p2
+p3
+```
+
+**Observations and variance contribution:** These graphical outputs show the observations with their variance contribution.
+
+```{r, warning=FALSE, message=FALSE}
+# It is also possible to represent the observations
+
+# As well as identify with colors those observations that explain the greatest
+
+# variance of the principal components
+
+p1<-fviz_pca_ind(PCA,col.ind = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel=TRUE,legend.title="Contrib.var", title="Records")+theme_bw()
+p2<-fviz_pca_ind(PCA,axes=c(1,3),col.ind = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel=TRUE,legend.title="Contrib.var", title="Records")+theme_bw()
+p3<-fviz_pca_ind(PCA,axes=c(2,3),col.ind = "contrib",
+gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+repel=TRUE,legend.title="Contrib.var", title="Records")+theme_bw()
+# Displaying graphics
+p1
+p2
+p3
+```
+
+**Observations and variables with variance contribution:** These graphical outputs show observations and the variables with their variance contribution.
+
+```{r, warning=FALSE, message=FALSE}
+# Joint representation of variables and observations
+# Relates the possible relationships between the contributions of the records
+# to the variances of the components and the weight of the variables in each
+# principal component
+p1<-fviz_pca(PCA,alpha.ind ="contrib", col.var = "cos2",
+col.ind="seagreen",
+gradient.cols = c("#FDF50E", "#FD960E", "#FD1E0E"),
+repel=TRUE, legend.title="Distance")+theme_bw()
+p2<-fviz_pca(PCA,axes=c(1,3),alpha.ind ="contrib",
+col.var = "cos2",col.ind="seagreen",
+gradient.cols = c("#FDF50E", "#FD960E", "#FD1E0E"),
+repel=TRUE, legend.title="Distance")+theme_bw()
+p3<-fviz_pca(PCA,axes=c(2,3),alpha.ind ="contrib",
+col.var = "cos2",col.ind="seagreen",
+gradient.cols = c("#FDF50E", "#FD960E", "#FD1E0E"),
+repel=TRUE, legend.title="Distance")+theme_bw()
+# Displaying graphics
+p1
+p2
+p3
+```
+
+**Coordinates in the new reference system** Finally, since the object of this study was to reduce the dimension of the data set, it is possible to obtain the coordinates of the original data in the new reference system. In fact, they are stored since we used the prcomp function to create the PCA variable.
+
+```{r, warning=FALSE, message=FALSE}
+head(PCA$x)
+```
+
+<br><br>
+
+# 4. MULTIVARIATE ANALYSIS: FA
+
+## 4.1 GROUP 1: CLUSTER.X, MONTHS, WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A AND FRIJOL_B
+
+```{r}
+bbdd_datos_num<-data.frame(CLUSTER.x, MONTHS, WEIGHT, HEIGHT, MUAC, TAMANHO_HOG, MAIZ_A, FRIJOL_B)
+bbdd_datos_num_clean <- na.omit(bbdd_datos_num)
+```
+
+We began by evaluating the optimal number of factors to retain, employing two distinct models to guide the extraction process.
+
+```{r, warning=FALSE, message=FALSE}
+### Test of two models with three factors
+modelo1<-fa(bbdd_datos_num_clean,
+            nfactors = 3,
+            rotate = "none",
+            fm="mle") # likelihood method
+modelo2<-fa(bbdd_datos_num_clean,
+            nfactors = 3,
+            rotate = "none",
+            fm="minres") # minimal residual model
+# Outputs of these models: factorial matrices, etc.
+print("Model 1: mle")
+modelo1$loadings
+print("Model 2: minres")
+modelo2$loadings
+```
+
+Finally, a comparison of the communalities between both methods is provided. As shown, the **minimum residual model** (second column) consistently yields higher values than the **maximum likelihood** approach (first column).
+
+```{r, warning=FALSE, message=FALSE}
+# Comparing communalities
+sort(modelo1$communality,decreasing = T)->c1
+sort(modelo2$communality,decreasing = T)->c2
+head(cbind(c1,c2))
+
+# Comparison of uniqueness, that is, the proportion of variance that has not been explained by the factor (1-communality)
+sort(modelo1$uniquenesses,decreasing = T)->u1
+sort(modelo2$uniquenesses,decreasing = T)->u2
+head(cbind(u1,u2),n=10)
+```
+
+### Appropriate number of latent factors
+
+The results indicate that the **minimum residual (minres)** model explains slightly more variance than the maximum likelihood approach. Given that the data exhibits a clear departure from normality, the minres method proves more robust and better suited for our sample. Nevertheless, both models converge on a total cumulative variance of only 54.6%, suggesting that a three-factor structure is insufficient to capture the underlying complexity of the dataset. Consequently, we have refined the analysis by extending the extraction to a **four-factor model**.
+
+```{r, warning=FALSE, message=FALSE}
+minres<-fa(bbdd_datos_num_clean,
+            nfactors = 4,
+            rotate = "none",
+            fm="minres") # minimal residual model
+# Outputs of these models: factorial matrices, etc.
+print("Minres minres")
+minres$loadings
+```
+
+Increasing the number of factors to four allowed us to capture 70.3% of the cumulative variance. Based on this substantial improvement, we conclude that the four-factor structure provides the most parsimonious and accurate fit for our data.
+
+<br>
+
+The primary factor (accounting for 39.7% of the variance) is clearly defined by physical growth metrics, specifically Weight, Height, and Age in months. In contrast, the second and third factors isolate household scale and specific dietary patterns—notably bean consumption—as distinct dimensions. Interestingly, the fourth factor identifies MUAC (Mid-Upper Arm Circumference) as a standalone nutritional indicator, operating independently of general physical development. This four-factor structure exhibits strong internal consistency, offering a robust foundation for subsequent classification analysis across the various study sites.
+
+<br>
+
+While a five-factor solution was initially considered, it was ultimately passed over in favor of parsimony. The four-factor model already accounts for 70.3% of the total variance, offering a structure that is both statistically lean and theoretically sound. Adding a fifth factor yielded diminishing returns in explanatory power and risked over-fragmenting the existing nutritional and demographic dimensions, potentially obscuring the clarity of the current model.
+
+<br>
+
+We will now provide graphical validation to corroborate this structure.
+
+```{r, warning=FALSE, message=FALSE}
+# Scree plot
+scree(bbdd_datos_num_clean)
+```
+
+The **Scree Plot** provides further empirical support for a four-factor structure. A distinct 'elbow' is visible at the fourth component, marking the inflection point where eigenvalues begin to level off. By retaining these four factors, we capture 70.3% of the cumulative variance, effectively condensing the dataset’s complexity without sacrificing significant explanatory power.
+
+```{r, warning=FALSE, message=FALSE}
+#Parallel analysis
+fa.parallel(bbdd_datos_num_clean,n.obs=100,fa="fa",fm="ml")
+```
+
+The **Factor Diagram** reveals a remarkably 'simple structure,' where each variable is cleanly partitioned into a specific dimension with minimal cross-loadings. While physical development metrics load heavily onto Factor 1, Factors 2 and 3 isolate household scale and pulse consumption, respectively. Crucially, the visual evidence confirms MUAC’s role as a standalone nutritional indicator in Factor 4, distinct from overall growth. This clear spatial separation reinforces the model's validity, demonstrating that these four dimensions capture truly independent underlying constructs.
+
+<br>
+
+Based on the convergence of both the statistical metrics and the graphical evidence, the four-factor model is formally adopted as the most robust framework for this analysis. This configuration strikes the ideal balance between complexity and interpretability, providing a stable foundation for the subsequent classification and regional comparisons.
+
+<br>
+
+### Varimax model
+
+A four-factor model was estimated using a Varimax rotation to achieve a simpler, more interpretable structure. This orthogonal rotation was selected to maximize the loading variance across factors, thereby clarifying the thematic boundaries between our identified dimensions.
+
+```{r, warning=FALSE, message=FALSE}
+modelo_varimax<-fa(bbdd_datos_num,nfactors = 4,rotate = "varimax",
+fa="mle")
+# The rotated factorial matrix is shown
+print(modelo_varimax$loadings,cut=0)
+```
+
+While factor associations could be inferred directly from the correlation matrix, a graphical representation offers a more efficient and intuitive interpretation of the underlying structure. The resulting factor diagram clearly maps the first dimension to items. These variables correspond to the specific questionnaire items designed to assess Extraversion, confirming a strong alignment between our empirical findings and the theoretical construct.
+
+```{r, warning=FALSE, message=FALSE}
+fa.diagram(modelo_varimax)
+```
+
+In the factor diagram, variables such as **MAIZ_A** and **CLUSTER.x** lack connecting arrows, as their loadings do not meet the predefined 0.30 threshold. This absence reflects a high degree of uniqueness, suggesting that the variance in these variables is driven by specific factors rather than the common latent constructs identified. As a result, they remain independent of the four primary dimensions and do not dilute the core factor definitions.
+
+The resulting factor diagram achieves what is often described as a 'simple structure' the benchmark for clarity in factor analysis. The direct paths between the latent factors and their respective indicators (such as the robust association between MR1 and anthropometric metrics) underscore strong convergent validity. Furthermore, the scarcity of cross-loadings confirms that the four dimensions function as statistically distinct constructs. This high degree of separation ensures that each dimension provides a clear, non-redundant lens through which to interpret the sample’s variability.
+
+<br><br>
+
+## 4.2. GROUP 2 (KMO'S SELECTION): ESTRATO.x, MONTHS, WEIGHT, HEIGHT, MUAC, NUM_FUENT_INGRES
+
+We also considered applying the analysis to an alternative subset of the data, as our previous **Principal Component Analysis (PCA)** suggested it might yield a more refined structure. The objective is to determine whether the latent dimensions identified through Factor Analysis remain consistent when compared to the PCA results, thereby ensuring the robustness of our conclusions across different methodological approaches:
+
+```{r, warning=FALSE, message=FALSE}
+bbdd_datos_num2<-data.frame(ESTRATO.x, MONTHS, WEIGHT, HEIGHT, MUAC, NUM_FUENT_INGRES)
+bbdd_datos_num2_clean <- na.omit(bbdd_datos_num2)
+```
+
+We will now evaluate the comparative effectiveness of both models to determine the most reliable criterion for factor retention. This assessment is essential to identify which approach provides a more robust justification for the final factor count.
+
+```{r, warning=FALSE, message=FALSE}
+### Test of two models with three factors
+modelo1<-fa(bbdd_datos_num2_clean,
+            nfactors = 3,
+            rotate = "none",
+            fm="mle") # likelihood method
+modelo2<-fa(bbdd_datos_num2_clean,
+            nfactors = 3,
+            rotate = "none",
+            fm="minres") # minimal residual model
+# Outputs of these models: factorial matrices, etc.
+print("Model 1: mle")
+modelo1$loadings
+print("Model 2: minres")
+modelo2$loadings
+```
+
+The results once again corroborate that the minimum residual (minres) method is the most appropriate approach for this dataset. This consistency across different tests reinforces our decision to prioritize this method over other extraction alternatives.
+
+### Appropriate number of latent factors
+
+The next step involves identifying the optimal number of factors to ensure a parsimonious yet comprehensive representation of the dataset.
+
+```{r, warning=FALSE, message=FALSE}
+#minres with nfactors=2
+minres<-fa(bbdd_datos_num2_clean,
+            nfactors = 2,
+            rotate = "none",
+            fm="minres") # minimal residual model
+# Outputs of these models: factorial matrices, etc.
+print("Minres with 2 factors")
+minres$loadings
+
+#minres with nfactors=3
+minres<-fa(bbdd_datos_num2_clean,
+            nfactors = 3,
+            rotate = "none",
+            fm="minres") # minimal residual model
+# Outputs of these models: factorial matrices, etc.
+print("Minres with 3 factors")
+minres$loadings
+
+#minres with nfactors=4
+minres<-fa(bbdd_datos_num2_clean,
+            nfactors = 4,
+            rotate = "none",
+            fm="minres") # minimal residual model
+# Outputs of these models: factorial matrices, etc.
+print("Minres with 4 factors")
+minres$loadings
+```
+
+A **three-factor** structure accounts for 79% of the total variance—a substantial figure that ensures a highly accurate representation of the underlying data. Given this strong explanatory power, we have opted to proceed with a three-factor model for the remainder of the analysis.
+
+To further validate this choice, we will now provide a graphical assessment to corroborate that a three-factor structure is indeed the most appropriate fit for the data.
+
+```{r, warning=FALSE, message=FALSE}
+# Scree plot
+scree(bbdd_datos_num2_clean)
+```
+
+```{r, warning=FALSE, message=FALSE}
+#Parallel analysis
+fa.parallel(bbdd_datos_num2_clean,n.obs=100,fa="fa",fm="ml")
+```
+
+With these plots we confirm that the analysis identifies a **3-factor structure** as the optimal model, accounting for a robust **79% of the total variance**. The factor diagram reveals three clearly defined dimensions: general physical development (F1), geographical stratum (F2), and MUAC-specific nutritional proportionality (F3). Higher-order models were rejected in favor of parsimony, as the current 3-factor solution provides high interpretability while accurately reflecting the independence of socioeconomic indicators like income sources.
+
+<br>
+
+### Varimax model
+
+We subsequently applied a Varimax rotation to the model.
+
+```{r, warning=FALSE, message=FALSE}
+modelo_varimax<-fa(bbdd_datos_num2,nfactors = 3,rotate = "varimax",
+fa="mle")
+# The rotated factorial matrix is shown
+print(modelo_varimax$loadings,cut=0)
+```
+
+The Varimax-rotated model confirms a 3-factor structure with 79% cumulative variance. **Factor 1** consolidates integral physical development; **Factor 2** isolates the geographical impact (Stratum) as an independent dimension; and **Factor 3** reveals nuances in MUAC proportionality relative to age. This structure is highly parsimonious and theoretically consistent with public health indicators.
+
+```{r, warning=FALSE, message=FALSE}
+fa.diagram(modelo_varimax)
+```
+
+The factor score map corroborates the structure identified in the component matrix. The distinct grouping along the Factor 2 axis validates **Social Stratum (Estrato)** as a primary differentiating variable within the sample. Simultaneously, the tight alignment of the Weight, Height, and Age vectors underscores the strong cohesion of Factor 1 as a definitive indicator of **biological growth**. Conversely, the orientation of the **MUAC** vector identifies a complementary yet distinct nutritional dimension, further refining our understanding of the dataset's complexity."<br>
+
+<br><br>
+
+
+# 5. MULTIVARIANT ANALYSIS: CLUSTER
+
+```{r, warning=FALSE, message=FALSE}
+bbdd_datos_num2<-data.frame(ESTRATO.x, MONTHS, WEIGHT, HEIGHT, MUAC, NUM_FUENT_INGRES)
+bbdd_datos_num2_clean <- na.omit(bbdd_datos_num2)
+# To prevent the cluster analysis from being influenced by any arbitrary variable, the data are standar
+bbdd_datos_num2_clean<-as.data.frame(scale(bbdd_datos_num2_clean))
+```
+
+## Some distances for cluster analysis
+
+```{r, warning=FALSE, message=FALSE}
+distance<- get_dist(bbdd_datos_num2_clean)
+fviz_dist(distance, gradient = list(low ="yellow", mid = "white", high = "brown"))
+```
+
+The **Dissimilarity Matrix** visually confirms a robust data structure, indicating a high potential for meaningful clustering. The prominence of extensive yellow blocks (representing low distance) reveals highly homogeneous profiles within the sample, thereby validating the suitability of a cluster analysis. These groupings align with our earlier **Scree Plot** findings, which had already identified a clear differentiation of factors. Conversely, the deep red bands highlight significant outliers or individuals with nutritional and productive profiles that deviate sharply from the norm. This contrast demonstrates the model’s effectiveness in isolating subjects based on their specific anthropometric and production-related variables.
+
+<br>
+
+## Hierarchical clustering: Ward’s method
+
+The hierarchical clustering approach was employed to reveal the underlying data structure based on pairwise distances. The following dendrogram illustrates this hierarchy, where the vertical lines represent the degree of dissimilarity between clusters. By analyzing the lengths of these branches, we can visually estimate the optimal number of groups, identifying the threshold that yields the most stable and interpretable partition for our sample.
+
+```{r, warning=FALSE, message=FALSE}
+dendrogram <- hclust(dist(bbdd_datos_num2_clean, method = 'euclidean'), method = 'ward.D')
+ggdendrogram(dendrogram, rotate = FALSE, labels = FALSE, theme_dendro = TRUE) +
+labs(title = "Dendrograma")
+```
+
+The hierarchical analysis, as depicted in the dendrogram, corroborates the structure identified in previous stages, revealing a distinct primary partition before reaching the final level of aggregation. The substantial height of the upper branches confirms significant **inter-cluster heterogeneity**, further validating the robustness of the segmentation in isolating distinct profiles. This **topological consistency** aligns with both the Dissimilarity Matrix and the earlier Scree Plot findings, reinforcing a parsimonious and statistically sound interpretation of the dataset.
+
+<br>
+
+## Non-hierarchical clustering: K-means algorithm
+
+```{r, warning=FALSE, message=FALSE}
+k2 <- kmeans(bbdd_datos_num2_clean, centers = 2, nstart = 25)
+# Displaying all the fields of the object k2
+str(k2)
+k2$centers
+```
+
+The cluster profile analysis reveals a distinct segmentation driven primarily by **chronological age and physical development**. **Cluster 1** represents a demographic with robust anthropometric indicators and advanced age, whereas **Cluster 2** captures individuals with significantly lower weight, height, and mid-upper arm circumference (MUAC) values. The pronounced polarization in the cluster centers for **MONTHS, WEIGHT, and HEIGHT** (with a divergence approaching 1.6 standard deviations) confirms that age and physical scale possess the highest **discriminatory power** within this population's structure.
+
+<br>
+
+To synthesize these findings, we utilized the *fviz_cluster* function to provide a clear and intuitive spatial representation of the groupings. This visualization effectively maps the high-dimensional data onto a two-dimensional plane, allowing for a direct assessment of the clusters' separation and the internal cohesion of each identified segment.
+
+```{r, warning=FALSE, message=FALSE}
+fviz_cluster(k2,data=bbdd_datos_num2_clean)
+```
+
+As a complementary diagnostic, a pairwise scatterplot matrix was generated to visualize the clusters against the original variables. This approach allows us to move beyond latent dimensions and observe how the groupings manifest across raw metrics, providing a more granular validation of the decision boundaries between the identified segments.
+
+```{r, warning=FALSE, message=FALSE}
+bbdd_datos_num2_clean %>%
+as_tibble() %>%
+mutate(cluster = k2$cluster,
+state = row.names(bbdd_datos_num2_clean)) %>%
+ggplot(aes(WEIGHT, HEIGHT, color = factor(cluster), label = state)) +
+geom_text()
+```
+
+Since the K-means algorithm requires the number of clusters to be specified a priori, we conducted a sensitivity analysis by iterating the process across multiple K-values. This comparative approach, supported by diagnostic visualizations, allows us to examine the structural shifts between solutions and identify the most stable and theoretically sound partition for the dataset.
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(123)
+k3 <- kmeans(bbdd_datos_num2_clean, centers = 3, nstart = 25)
+k4 <- kmeans(bbdd_datos_num2_clean, centers = 4, nstart = 25)
+k5 <- kmeans(bbdd_datos_num2_clean, centers = 5, nstart = 25)
+# Plots to compare
+p1 <- fviz_cluster(k2, geom = "point", data = bbdd_datos_num2_clean) + ggtitle("k = 2")
+p2 <- fviz_cluster(k3, geom = "point", data = bbdd_datos_num2_clean) + ggtitle("k = 3")
+p3 <- fviz_cluster(k4, geom = "point", data = bbdd_datos_num2_clean) + ggtitle("k = 4")
+p4 <- fviz_cluster(k5, geom = "point", data = bbdd_datos_num2_clean) + ggtitle("k = 5")
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+```
+
+### Elbow method
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(123)
+fviz_nbclust(bbdd_datos_num2_clean, kmeans, method = "wss")
+```
+
+### Silhouette Method
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(123)
+fviz_nbclust(bbdd_datos_num2_clean, kmeans, method = "silhouette")
+```
+
+### Gap Statistical Method
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(123)
+gap_stat <- clusGap(bbdd_datos_num2_clean, FUN = kmeans, nstart = 25,K.max = 10, B = 50)
+fviz_gap_stat(gap_stat)
+```
+
+The selection of a **two-cluster solution** is definitively supported by the convergence of three fundamental diagnostic criteria:
+
+-   **Optimal Cohesion:** The **Silhouette Coefficient** peaks at k=2, indicating that this configuration yields the highest degree of internal consistency and external separation.
+
+-   **Statistical Parsimony:** The **Elbow Method (WSS)** reveals that the most significant reduction in within-cluster variance occurs at the transition to two groups, identifying the optimal point of diminishing returns.
+
+-   **Hierarchical Validation:** The **Dendrogram** confirms a natural primary cleavage in the sample, with a substantial dissimilarity distance between the two main branches.
+
+Consequently, this binary structure provides the most robust and interpretable framework, effectively isolating a **high-development profile** from a **vulnerability profile** based on the analyzed anthropometric factors.
+
+## Analysis of results
+
+Following the rigorous evaluation of cluster optimality in the preceding section, we have formalized the analysis using the most statistically sound number of groups. This finalized partition serves as the definitive framework for the subsequent profiling and comparative assessment of the sample's sub-populations.
+
+```{r, warning=FALSE, message=FALSE}
+set.seed(123)
+final <- kmeans(bbdd_datos_num2_clean, 2, nstart = 25)
+print(final$centers)
+# Final output
+fviz_cluster(final, data = bbdd_datos_num2_clean)
+```
+
+Finally, the cluster assignments were merged back into the primary dataset to facilitate a granular descriptive analysis. By integrating these group labels, we can generate cluster-specific statistics that transform abstract segments into actionable profiles, providing a clear comparison of the socio-economic and nutritional metrics across the identified sub-populations.
+
+```{r, warning=FALSE, message=FALSE}
+bbdd_datos_num2_clean %>%
+mutate(Cluster = final$cluster) %>%
+group_by(Cluster) %>%
+summarise_all("mean")
+```
+
+<br><br><br>
+
+
+# 6. MULTIVARIANT ANALYSIS: DA
+
+```{r, warning=FALSE, message=FALSE}
+bbdd_datos_num <- bbdd_last[, c("ESTRATO.x", "MONTHS", "WEIGHT", "HEIGHT", "MUAC", "NUM_FUENT_INGRES")]
+```
+
+### Graphical exploration of data
+
+The **Sunting** status was selected as the grouping variable to determine if biometric and socioeconomic indicators can accurately discriminate between children with normal growth and those with chronic malnutrition. This allows us to identify which factors contribute most significantly to the development of stunting in the study population.
+
+```{r}
+mis_colores<-c("pink", "blue")
+
+
+datos_clean <- bbdd_datos_num %>%
+  filter(!is.na(bbdd_last$SUNTING)) %>%
+  mutate(SUNTING = factor(SUNTING, labels = c("No Stunting", "Stunting")))
+
+
+mi_estilo <- list(
+  scale_fill_manual(values = mis_colores),
+  theme_minimal(),
+  geom_histogram(position = "identity", alpha = 0.6, bins = 30)
+)
+
+
+p1 <- ggplot(data = datos_clean, aes(x = ESTRATO.x, fill = SUNTING)) + mi_estilo + labs(title = "Estrato")
+p2 <- ggplot(data = datos_clean, aes(x = MONTHS, fill = SUNTING)) + mi_estilo + labs(title = "Months")
+p3 <- ggplot(data = datos_clean, aes(x = WEIGHT, fill = SUNTING)) + mi_estilo + labs(title = "Weight")
+p4 <- ggplot(data = datos_clean, aes(x = HEIGHT, fill = SUNTING)) + mi_estilo + labs(title = "Height")
+p5 <- ggplot(data = datos_clean, aes(x = MUAC, fill = SUNTING)) + mi_estilo + labs(title = "MUAC")
+p6 <- ggplot(data = datos_clean, aes(x = NUM_FUENT_INGRES, fill = SUNTING)) + mi_estilo + labs(title = "Num Fuent Ingres")
+
+ggarrange(p1, p2, p3, p4, p5, p6, nrow = 3, ncol=3, common.legend = TRUE, legend = "bottom")
+```
+
+```{r, warning=FALSE, message=FALSE}
+pairs(x = datos_clean[, c("ESTRATO.x", "MONTHS", "WEIGHT", "HEIGHT", "MUAC", "NUM_FUENT_INGRES")],
+col = c("blue", "orange")[datos_clean$SUNTING], pch = 19, main="Pairwise Graph Matrix")
+```
+
+DA is employed to manage the high correlation between predictors like Weight, Height, and MUAC. The analysis identifies the optimal linear combination of these dependent variables to maximize the separation between stunted and non-stunted groups, highlighting which factors are the most significant discriminants of chronic malnutrition.
+
+<br> 
+
+
+```{r}
+scatterplot3d(bbdd_datos_num$MONTHS, bbdd_datos_num$WEIGHT, bbdd_datos_num$HEIGHT, color="blue", pch=19, grid = TRUE, xlab = "MONTHS", ylab = "WEIGHT",
+zlab = "HEIGHT", angle = 65, cex.axis = 0.6)
+              
+```
+
+<br>
+
+### Univariate Normality
+
+We make a graphical exploration of the normality of the univariate distributions of our predictors: 
+
+```{r, warning=FALSE, message=FALSE}
+par(mfrow = c(2, 3)) 
+
+grupo_factor <- as.factor(bbdd_last$SUNTING)
+niveles <- levels(grupo_factor)
+
+for (k in 1:6) {
+  j0 <- names(bbdd_datos_num)[k]
+  x0 <- seq(min(bbdd_datos_num[, k], na.rm = TRUE), 
+            max(bbdd_datos_num[, k], na.rm = TRUE), le = 50)
+  
+  for (i in 1:length(niveles)) {
+    i0 <- niveles[i]
+    indices <- which(bbdd_last$SUNTING == i0)
+    x <- bbdd_datos_num[indices, j0]
+    x <- x[!is.na(x)]
+    
+    if(length(x) > 0) {
+      hist(x, proba = TRUE, col = "lightgrey", 
+           main = paste("Var:", j0, "| G:", i0), 
+           xlab = "Value", ylab = "Density", cex.main = 0.8)
+
+      lines(x0, dnorm(x0, mean(x), sd(x)), col = "blue", lwd = 2)
+    }
+  }
+}
+```
+
+### QQ-Plots
+
+```{r, warning=FALSE, message=FALSE}
+par(mfrow = c(2, 3)) 
+
+grupo_factor <- as.factor(bbdd_last$SUNTING)
+niveles <- levels(grupo_factor)
+
+for (k in 1:6) {
+  j0 <- names(bbdd_datos_num)[k]
+  x0 <- seq(min(bbdd_datos_num[, k], na.rm = TRUE), 
+            max(bbdd_datos_num[, k], na.rm = TRUE), le = 50)
+  
+  for (i in 1:length(niveles)) {
+    i0 <- niveles[i]
+    indices <- which(bbdd_last$SUNTING == i0)
+    x <- bbdd_datos_num[indices, j0]
+    x <- x[!is.na(x)]
+    
+    if(length(x) > 0) {
+      qqnorm(x, 
+             main = paste("G:", i0, "-", j0), 
+             pch = 19, 
+             col = i + 1,     
+             cex.main = 0.8) 
+      qqline(x, col = "black", lwd = 1)
+    }
+  }
+}
+
+```
+
+This exploratory analysis can give us an idea of the possible normal distribution of the univariate variables,
+but it is always better to do the respective normality tests.
+
+#### Univariate normality test (Shapiro-Wilk)
+
+```{r, warning=FALSE, message=FALSE}
+datos <- bbdd_last[, c("ESTRATO.x", "MONTHS", "WEIGHT", "HEIGHT", "MUAC", "NUM_FUENT_INGRES", "SUNTING")]
+datos_tidy <- melt(datos, id.vars = "SUNTING")
+
+shapiro_results <- aggregate(value ~ SUNTING + variable, 
+                             data = datos_tidy, 
+                             FUN = function(z) shapiro.test(z)$p.value)
+
+names(shapiro_results)[3] <- "p_value"
+print(shapiro_results)
+```
+
+The Shapiro-Wilk test yielded p-values significantly below 0.05 for all variables, indicating a departure from multivariate normality. 
+
+However, Linear Discriminant Analysis (LDA) was still performed due to its proven robustness with large sample sizes (n=567) and the practical need to identify the most significant predictors of stunting status.
+
+<br>
+
+### Multivariate normality 
+The assessment of multivariate normality could not be conducted due to computational constraints that prevented the execution of the **MVN** and **gsl** libraries, as well as other alternative packages that were attempted.
+
+<br>
+
+### Homogeneity of variance 
+
+For multiple predictors, Box's M test is used to assess the homogeneity of covariance matrices.
+
+It is very sensitive so it is recommended to use a significance (p-value) < 0.001 to reject the null hypothesis. 
+
+```{r}
+# Quantitative variables:
+predictors <- bbdd_last[, c("ESTRATO.x", "MONTHS", "WEIGHT", "HEIGHT", "MUAC", "NUM_FUENT_INGRES")]
+
+# test:
+boxM(data=predictors, grouping=datos$SUNTING)
+```
+
+The null hypothesis for this test states that the covariance matrices are equal, which is a required assumption for LDA. Since the obtained p-value (2.2e-16) is significantly lower than the 0.001 threshold, we reject the null hypothesis. Consequently, LDA is not suitable for our data, and applying Quadratic Discriminant Analysis is more appropriate.
+
+Despite this, we proceeded with the linear model and will conduct a final comparative analysis.
+
+<br>
+
+#### Discriminant function
+
+```{r, warning=FALSE, message=FALSE}
+lda_model <- lda(formula = SUNTING ~ ESTRATO.x + MONTHS + WEIGHT + HEIGHT + MUAC + NUM_FUENT_INGRES, 
+                  data = bbdd_last)
+print(lda_model)
+```
+
+The output shows the prior probabilities for each group: 42.68% for group 0 (non-stunted) and 57.32% for group 1 (stunted). The group means highlight that stunted children (Group 1) are generally older (33.46 months) but exhibit lower weight (10.91 kg), lower height (81.73 cm), and smaller mid-upper arm circumference (149.10 mm) than their non-stunted peers.
+
+The coefficients of the linear discriminant provide the classification model:
+LD1 = 0.01*ESTRATO.x+0.183*MONTHS-0.244*WEIGHT-0.193*HEIGHT-0.014*MUAC+0.007*NUM_FUENT_INGRES
+
+To complete the analysis with a practical example using your SUNTING model, we can apply the predict function.
+
+Since our model uses 5 variables, let’s consider a new child with these measurements: ESTRATO.x=1, MONTHS = 24, WEIGHT = 12, HEIGHT = 88, MUAC = 155, and NUM_FUENT_INGRES = 1.
+
+```{r, warning=FALSE, message=FALSE}
+nuevas_observaciones <- data.frame(ESTRATO.x=1, MONTHS = 24, WEIGHT = 12, HEIGHT = 88, MUAC = 155, NUM_FUENT_INGRES = 1)
+predict(object = lda_model, newdata = nuevas_observaciones)
+```
+
+The predict function has classified the new case into **Group 0** (non-stunted). The **posterior probabilities** show a very high level of certainty, with a **97.34%** probability of belonging to the healthy group and only a **2.66%** probability of belonging to the stunting group.
+
+The **LD1 score of -2.62** places this individual deep within the territory of Group 0. Since the coefficients for Weight and Height in your model were negative, this result indicates that the child's physical measurements are high enough to move them away from the stunting profile.
+
+<br> 
+
+#### Model validation
+
+A first basic form of model validation consists of trying to see how well it classifies in a test set from which
+we know the species to which each record belongs. The usual way to proceed is to divide the original dataset
+into two subsets: the first, known as training set, with approximately 80% of the records, which will be
+used to fit the model; and the second, known as test set, with 20% of the remaining records, which will be
+used for cross-validation.
+
+```{r message=FALSE, warning=FALSE}
+pred <- predict(lda_model, dimen = 1)
+confusionmatrix(bbdd_last$SUNTING, pred$class)
+# Classification error percentage
+trainig_error <- mean(bbdd_last$SUNTING != pred$class) * 100
+paste("trainig_error=", trainig_error, "%")
+```
+
+In this case the correct classifications rate is 82%
+
+<br> 
+
+#### Displaying rankings
+
+Each color represents a classification region
+according to the model, the centroid of each region and the real value of the observations are shown.
+
+```{r message=FALSE, warning=FALSE}
+partimat(SUNTING ~ ESTRATO.x + MONTHS + WEIGHT + HEIGHT + MUAC + NUM_FUENT_INGRES, 
+         data = datos_clean, 
+         method = "lda", 
+         prec = 50, # Reducimos precisión para que cargue                      más rápido
+         main="LDA Partition Plot: Stunting Classification           Regions",
+         image.colors = c("lightgreen", "lightcoral"),
+         col.mean = "blue",
+         nplots.vert = 2, 
+         nplots.hor = 3)
+```
+
+The partition maps illustrate the decision boundaries of the LDA model for each pair of variables. Each color-coded region represents a specific classification category: green corresponds to group 0 (no malnutrition), while red/coral denotes group 1 (stunting).
+
+Individual observations (represented by small points) located within the "incorrect" color region signify classification errors by the model.
+
+It is observed that for ESTRATO.x and NUM_FUENT_INGRES, the observations are highly overlapped; consequently, these variables possess low discriminatory power for group differentiation.
+
+
+<br> 
+
+### QUADRATIC DISCRIMINANT ANALYSIS 
+
+To ensure the model's predictive validity, the dataset was randomly partitioned into training and testing sets:
+
+```{r}
+datos$SUNTING <- as.factor(datos$SUNTING)
+
+set.seed(12)
+
+# Partitioning the dataset: training (80%) + test (20%)
+trainIndex<-createDataPartition(datos$SUNTING,p=0.80, list=FALSE)
+
+datos_train<-datos[trainIndex,]
+datos_test<-datos[-trainIndex,]
+
+
+# We verified that the proportions of both values are similar:
+prop.table(table(datos_train$SUNTING))
+prop.table(table(datos_test$SUNTING))
+
+plot(datos_train[, 1:2], col = datos$SUNTING, pch = 19, main="Training dataset")
+```
+
+```{r}
+plot(datos_test[, 1:2], col = datos$SUNTING, pch = 19, main="Test dataset")
+```
+
+We graphically display how both groups of data were obtained, which appear to be similar.
+
+<br>
+
+### Graphical exploration of data
+
+First, we explore how well (or poorly) each of the five explanatory variables considered independently
+classifies for the groups: 
+
+```{r}
+p1 <- ggplot(data = datos_train, aes(x = ESTRATO.x, fill = SUNTING)) +
+geom_histogram(position = "identity", alpha = 0.5)
+
+p2 <- ggplot(data = datos_train, aes(x = MONTHS, fill = SUNTING)) +
+geom_histogram(position = "identity", alpha = 0.5)
+
+p3 <- ggplot(data = datos_train, aes(x = WEIGHT, fill = SUNTING)) +
+geom_histogram(position = "identity", alpha = 0.5)
+
+p4 <- ggplot(data = datos_train, aes(x = HEIGHT, fill = SUNTING)) +
+geom_histogram(position = "identity", alpha = 0.5)
+
+p5 <- ggplot(data = datos_train, aes(x = MUAC, fill = SUNTING)) +
+geom_histogram(position = "identity", alpha = 0.5)
+
+p6 <- ggplot(data = datos_train, aes(x = NUM_FUENT_INGRES, fill = SUNTING)) +
+geom_histogram(position = "identity", alpha = 0.5)
+
+
+ggarrange(p1, p2, p3, p4, p5, p6, nrow = 3, ncol=3, common.legend = TRUE, legend = "bottom")
+```
+
+The variables WEIGHT and HEIGHT show the greatest degree of separation. However, in general, none of the variables studied can classify STUNTING on their own, as the distributions of both classes significantly overlap in all the plots.
+
+<br> 
+
+### Univariate normality
+
+We make a graphical exploration of the normality of the univariate distributions of our predictors: 
+
+```{r}
+# Histogram representation of each variable for each group
+par(mfrow = c(2, 3)) 
+
+grupo_factor <- as.factor(datos$SUNTING)
+niveles <- levels(grupo_factor)
+
+for (k in 1:6) {
+  j0 <- names(bbdd_datos_num)[k]
+  x0 <- seq(min(bbdd_datos_num[, k], na.rm = TRUE), 
+            max(bbdd_datos_num[, k], na.rm = TRUE), le = 50)
+  
+  for (i in 1:length(niveles)) {
+    i0 <- niveles[i]
+    indices <- which(datos$SUNTING == i0)
+    x <- bbdd_datos_num[indices, j0]
+    x <- x[!is.na(x)]
+    
+    if(length(x) > 0) {
+      hist(x, proba = TRUE, col = "lightgrey", 
+           main = paste("Var:", j0, "| G:", i0), 
+           xlab = "Value", ylab = "Density", cex.main = 0.8)
+
+      lines(x0, dnorm(x0, mean(x), sd(x)), col = "blue", lwd = 2)
+    }
+  }
+}
+```
+
+
+```{r}
+# Representation of normal quantiles of each variable for each group
+par(mfrow = c(2, 3)) 
+
+grupo_factor <- as.factor(datos$SUNTING)
+niveles <- levels(grupo_factor)
+
+for (k in 1:6) {
+  j0 <- names(bbdd_datos_num)[k]
+  x0 <- seq(min(bbdd_datos_num[, k], na.rm = TRUE), 
+            max(bbdd_datos_num[, k], na.rm = TRUE), le = 50)
+  
+  for (i in 1:length(niveles)) {
+    i0 <- niveles[i]
+    indices <- which(datos$SUNTING == i0)
+    x <- bbdd_datos_num[indices, j0]
+    x <- x[!is.na(x)]
+    
+    if(length(x) > 0) {
+      qqnorm(x, 
+             main = paste("G:", i0, "-", j0), 
+             pch = 19, 
+             col = i + 1,     
+             cex.main = 0.8) 
+      qqline(x, col = "black", lwd = 1)
+    }
+  }
+}
+
+```
+
+
+
+<br>
+
+### Univariate normality test (Saphiro-Wilk)
+
+```{r}
+# Shapiro-Wilk normality test for each variable in each group
+datos_tidy <- melt(datos_train, id.vars="SUNTING", value.name = "valor")
+
+shapiro2<-datos_tidy %>%
+group_by(SUNTING, variable) %>%
+summarise(p_value_Shapiro.test = round(shapiro.test(valor)$p.value,5))
+
+shapiro2
+```
+
+The Shapiro-Wilk test was applied to each variable within each group (Stunting and No Stunting). In most cases, the p-values were below 0.05, indicating a departure from normality. While Linear Discriminant Analysis (LDA) is sensitive to this violation, Quadratic Discriminant Analysis (QDA) tends to be more robust, further supporting our decision to prioritize the quadratic model.
+
+<br> 
+
+### Multivariate normality 
+The assessment of multivariate normality could not be conducted due to computational constraints that prevented the execution of the **MVN** and **gsl** libraries, as well as other alternative packages that were attempted.
+
+<br> 
+
+### Homogeneity of variance
+
+The null hypothesis to be tested is that of equality of covariance matrices in all groups:
+
+```{r}
+boxM(data = predictors, grouping = datos$SUNTING)
+```
+
+To verify the assumption of homogeneity of covariance matrices, Box's M-test was performed. The results lead to the rejection of the null hypothesis. This evidence of heteroscedasticity justifies the use of QDA.
+
+<br> 
+
+### Discriminant function 
+
+Although the assumption of multivariate normality is not verified, taking into account that the variances are
+not homogeneous, a quadratic discriminant model is adjusted because it is robust against the lack of
+this assumption, although it must be kept in mind given the possibility of obtaining unexpected results.
+
+
+The qda function of the MASS package performs the sorting.
+
+```{r}
+modelo_qda <- qda(SUNTING ~ ESTRATO.x + MONTHS + WEIGHT + HEIGHT + MUAC + NUM_FUENT_INGRES, data = datos_train)
+
+modelo_qda
+```
+
+The group means indicate the specific profiles for each category. Children in Group 0 (normal status) exhibit higher average values in anthropometric indicators such as HEIGHT (85.3 cm vs. 81.3 cm) and WEIGHT (11.89 kg vs. 10.82 kg) compared to Group 1. 
+
+These differences suggest that biometric variables are the primary drivers of the classification. In contrast, variables like NUM_FUENT_INGRES show nearly identical means (1.14 vs. 1.15), confirming their limited utility in discriminating between nutritional states.
+
+<br> 
+
+```{r}
+nuevas_observaciones <- datos_test
+predict(object = modelo_qda, newdata = nuevas_observaciones)
+```
+
+The model provides not only a discrete classification but also the posterior probabilities for each observation. 
+
+This enables the assessment of the robustness of the assignments: while observations such as number 9 are classified with nearly 100% certainty, others like number 10 exhibit greater ambiguity (probabilities of 0.54 vs 0.46), as they are situated near the decision boundary.
+
+<br>
+
+### Model validation 
+
+The confusionmatrix function of the biotools package performs cross-validation of the classification model.
+
+```{r}
+pred <- predict(object = modelo_qda, newdata = datos_test)
+confusionmatrix(datos_test$SUNTING, pred$class)
+
+# Classification error percentage
+trainig_error <- mean(datos_test$SUNTING != pred$class) * 100
+paste("trainig_error=", trainig_error, "%")
+```
+
+<br> 
+
+### Displaying rankings 
+
+The partimat function of the klaR package allows us to represent the classification limits of a linear
+or quadratic discriminant model for each pair of predictors. Each color represents a classification region
+according to the model, the centroid of each region and the real value of the observations are shown.
+
+```{r}
+
+partimat(formula = SUNTING ~ MONTHS + WEIGHT + HEIGHT, data = datos_test, method = "qda", prec = 400, image.colors = c("darkgoldenrod1", "skyblue2"), col.mean = "firebrick")
+
+partimat(formula = SUNTING ~ ESTRATO.x + NUM_FUENT_INGRES + MUAC, data = datos_test, method = "qda", prec = 400, image.colors = c("darkgoldenrod1", "skyblue2"), col.mean = "firebrick")
+
+```
+
+
+<br><br>
+
